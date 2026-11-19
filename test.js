@@ -1,0 +1,39 @@
+// node test.js  -> prints "ok" or throws
+const assert = require('assert');
+const M = require('./core.js');
+
+assert.strictEqual(M.fmt(450, 2), '4.5');
+assert.strictEqual(M.fmt(300, 2), '3');
+assert.strictEqual(M.fmt(5, 1), '0.5');
+assert.strictEqual(M.carries(58, 67), 2);
+assert.strictEqual(M.carries(12, 31), 0);
+
+assert.ok(M.isRight('4,5', '4.5'));
+assert.ok(!M.isRight('4.', '4'));
+assert.ok(!M.isRight('', '0'));
+assert.ok(M.isPrefix('4,', '4.52'));
+assert.ok(!M.isPrefix('5', '4.52'));
+
+// every generated answer is consistent and non-negative, for every preset
+for (const k of Object.keys(M.PRESETS)) {
+  const c = M.PRESETS[k];
+  for (let i = 0; i < 2000; i++) {
+    const q = M.nextQ(c), x = Number(q.x), y = Number(q.y), a = Number(q.ans);
+    const exp = { '+': x + y, '-': x - y, '×': x * y, '÷': x / y }[q.op];
+    assert.ok(Math.abs(exp - a) < 1e-9, k + ' ' + JSON.stringify(q));
+    assert.ok(a >= 0);
+  }
+}
+
+// focus is honoured
+const d7 = M.drill('×7');
+for (let i = 0; i < 200; i++) assert.ok(M.nextQ(d7).f === 7);
+const c2 = M.drill('+c2');
+for (let i = 0; i < 200; i++) assert.ok(M.nextQ(c2).tags.includes('+c2'));
+
+// analysis finds a slow ×7 and nothing else
+const qs = [];
+for (let f = 2; f <= 12; f++) for (let i = 0; i < 20; i++) qs.push({ tags: ['×', '×' + f], ms: f === 7 ? 4000 : 1500, slip: false });
+const gaps = M.analyse(qs);
+assert.deepStrictEqual(gaps.map(g => g.tag), ['×7']);
+console.log('ok');

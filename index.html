@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mental Math: calcolo veloce</title>
+<meta name="description" content="Allenamento di calcolo mentale a tempo con statistiche automatiche e esercizi mirati sulle tue lacune.">
+<link rel="stylesheet" href="style.css?v=1">
+<script>try { var t = localStorage.getItem('mm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body>
+<header>
+  <a href="#" id="home-link"><b>Mental Math</b></a>
+  <nav><button data-go="home">Gioca</button><button data-go="stats">Statistiche</button><button class="theme-btn" type="button">Tema</button></nav>
+</header>
+
+<main>
+<section id="home">
+  <div id="gaps-short"></div>
+  <h2>Modalità</h2>
+  <div id="presets" class="row"></div>
+  <form id="cfg">
+    <fieldset>
+      <legend>Operazioni</legend>
+      <label><input type="checkbox" name="add"> Addizione</label>
+      <span class="range">(<input type="number" name="addA0" min="0"> – <input type="number" name="addA1" min="0">) + (<input type="number" name="addB0" min="0"> – <input type="number" name="addB1" min="0">)</span>
+      <label><input type="checkbox" name="sub"> Sottrazione <small>(addizione al contrario)</small></label>
+      <label><input type="checkbox" name="mul"> Moltiplicazione</label>
+      <span class="range">(<input type="number" name="mulA0" min="1"> – <input type="number" name="mulA1" min="1">) × (<input type="number" name="mulB0" min="0"> – <input type="number" name="mulB1" min="0">)</span>
+      <label><input type="checkbox" name="div"> Divisione <small>(moltiplicazione al contrario)</small></label>
+    </fieldset>
+    <div class="row">
+      <label>Cifre decimali <select name="dec"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
+      <label>Durata <select name="dur"><option value="30">30 s</option><option value="60">60 s</option><option value="120">120 s</option><option value="300">5 min</option></select></label>
+    </div>
+    <p id="focus-note" class="muted"></p>
+    <button type="submit" class="primary">Inizia</button>
+  </form>
+</section>
+
+<section id="play" hidden>
+  <div class="row bar"><span>Tempo: <b id="time"></b></span><span>Punti: <b id="score">0</b></span></div>
+  <div id="question"></div>
+  <input id="answer" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Risposta">
+  <p class="muted">La risposta giusta passa da sola alla prossima. Esc per uscire senza salvare.</p>
+</section>
+
+<section id="result" hidden>
+  <h2 id="res-score"></h2>
+  <p id="res-detail"></p>
+  <div class="row"><button class="primary" id="again">Ancora</button><button data-go="stats">Statistiche</button><button data-go="home">Modalità</button></div>
+</section>
+
+<section id="stats" hidden>
+  <h2>Lacune</h2>
+  <p class="muted">Confronta il tuo tempo mediano su ogni tipo di domanda con quello della sua operazione (×7 contro tutte le ×, addizioni con 2 riporti contro tutte le addizioni). Servono almeno 10 domande di un tipo.</p>
+  <div id="gaps-full"></div>
+  <h2>Punteggi</h2>
+  <label>Modalità <select id="mode-pick"></select></label>
+  <div id="chart"></div>
+  <div id="sessions"></div>
+  <h2>Per operazione</h2>
+  <div id="ops"></div>
+  <h2>Dati</h2>
+  <p class="muted">Tutto resta in questo browser (niente account). Esporta un file per tenerne una copia o spostarlo su un altro dispositivo.</p>
+  <div class="row"><button id="export">Esporta</button><label class="btn">Importa<input type="file" id="import" accept="application/json" hidden></label><button id="wipe">Cancella tutto</button></div>
+</section>
+</main>
+
+<script src="core.js?v=1"></script>
+<script src="app.js?v=1"></script>
+<script src="notes-widget.js?v=2" data-site="mental-math"></script>
+</body>
+</html>
