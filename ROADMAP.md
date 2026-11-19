@@ -7,6 +7,7 @@
 - [x] Analisi delle lacune con allenamento mirato per ognuna
 - [x] Grafico dei punteggi per modalità, statistiche per operazione
 - [x] Feedback (site-notes), tema chiaro/scuro
+- [x] Importati i punteggi passati di Zetamac dal foglio Google (215 partite, solo punteggi: niente tempi per domanda, quindi non entrano nell'analisi delle lacune)
 - [ ] Giocare qualche settimana e tarare le soglie delle lacune (ora: n ≥ 10, mediana ≥ 1,25× la propria operazione)
 
 ## Idee
