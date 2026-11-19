@@ -23,4 +23,4 @@
 - Il nome Zetamac non si usa: la modalità di riferimento si chiama "Classica".
 
 ## Log
-- 2026-11-19: progetto avviato (dal task Google "fare reverse-engineer con zetamac"): MVP completo e pubblicato; lacune normalizzate per lunghezza del risultato; import dei punteggi passati (file in Dati-personali, non nel repo), grafico con la media del giorno.
+- 2026-11-19: progetto avviato (dal task Google "fare reverse-engineer con zetamac"): MVP completo e pubblicato; lacune normalizzate per lunghezza del risultato; import dei punteggi passati (file in Dati-personali, non nel repo), grafico con la media del giorno; statistiche su un'unica pagina (riepilogo di tutte le modalità con "Gioca", un grafico per modalità); moduli leggibili su mobile.
