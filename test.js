@@ -33,7 +33,14 @@ for (let i = 0; i < 200; i++) assert.ok(M.nextQ(c2).tags.includes('+c2'));
 
 // analysis finds a slow ×7 and nothing else
 const qs = [];
-for (let f = 2; f <= 12; f++) for (let i = 0; i < 20; i++) qs.push({ tags: ['×', '×' + f], ms: f === 7 ? 4000 : 1500, slip: false });
+for (let f = 2; f <= 12; f++) for (let i = 0; i < 20; i++) qs.push({ op: '×', tags: ['×', '×' + f], ms: f === 7 ? 4000 : 1500, slip: false });
 const gaps = M.analyse(qs);
 assert.deepStrictEqual(gaps.map(g => g.tag), ['×7']);
+// time that depends only on answer length (Classica + Numeri grandi mixed) is not a gap
+const big = [];
+for (const k of ['classica', 'grandi', 'estese']) for (let i = 0; i < 3000; i++) {
+  const q = M.nextQ(M.PRESETS[k]);
+  big.push({ op: q.op, tags: q.tags, al: q.al, ms: 500 * q.al, slip: false });
+}
+assert.deepStrictEqual(M.analyse(big).map(g => g.tag), []);
 console.log('ok');
