@@ -48,6 +48,7 @@
                      : { op: op, x: fmt(f * m, d), y: String(f), ans: fmt(m, d), f: f };
     }
     q.tags = tags(q, d);
+    q.al = q.ans.replace('.', '').length;
     return q;
   }
 
@@ -81,6 +82,12 @@
   var MIN = 10, SLOW = 1.25, LAST = 3000;
   function analyse(qs) {
     qs = qs.slice(-LAST);
+    // Bigger answers take longer for everyone: first divide each time by the median of questions
+    // with the same operation and the same number of answer digits, then compare tags on that ratio.
+    var groups = {};
+    var gk = function (q) { return q.op + (q.al || 0); };
+    qs.forEach(function (q) { (groups[gk(q)] = groups[gk(q)] || []).push(q.ms); });
+    var gm = {}; Object.keys(groups).forEach(function (k) { gm[k] = median(groups[k]); });
     var byTag = {};
     qs.forEach(function (q) { q.tags.forEach(function (t) { (byTag[t] = byTag[t] || []).push(q); }); });
     var out = [];
@@ -90,7 +97,7 @@
       var mt = median(list.map(function (q) { return q.ms; })), mo = median(base.map(function (q) { return q.ms; }));
       var slip = list.filter(function (q) { return q.slip; }).length / list.length;
       var slipO = base.filter(function (q) { return q.slip; }).length / base.length;
-      var ratio = mt / mo;
+      var ratio = median(list.map(function (q) { return q.ms / gm[gk(q)]; }));
       // slips are rarer and noisier than times: need more questions before flagging on them alone
       var slipGap = list.length >= 20 && slip >= 0.2 && slip >= 2 * slipO;
       if (ratio >= SLOW || slipGap) out.push({ tag: t, n: list.length, ms: mt, opMs: mo, ratio: ratio, slip: slip });

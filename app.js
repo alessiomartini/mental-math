@@ -28,6 +28,7 @@
 
   // ---------- views ----------
   function show(id) {
+    if (id !== 'play') game = null; // leaving mid-game (header buttons) discards it
     ['home', 'play', 'result', 'stats'].forEach(function (v) { $('#' + v).hidden = v !== id; });
     if (id === 'home') renderHome();
     if (id === 'stats') renderStats();
@@ -101,7 +102,7 @@
     if (!game) return;
     var q = game.q;
     if (MM.isRight(input.value, q.ans)) {
-      game.qs.push({ op: q.op, x: q.x, y: q.y, ms: Math.round(performance.now() - game.shown), slip: game.slip, tags: q.tags });
+      game.qs.push({ op: q.op, x: q.x, y: q.y, al: q.al, ms: Math.round(performance.now() - game.shown), slip: game.slip, tags: q.tags });
       game.score++; $('#score').textContent = game.score;
       next();
     } else if (!MM.isPrefix(input.value, q.ans)) game.slip = true;
@@ -133,8 +134,7 @@
     var g = MM.analyse(db.qs).filter(function (x) { var n = MM.drill(x.tag).name; return seen[n] ? false : (seen[n] = 1); }).slice(0, max);
     if (!g.length) return '';
     return g.map(function (x) {
-      return '<div class="gap"><span><b>' + esc(MM.label(x.tag)) + '</b><br><small>' + (x.ms / 1000).toFixed(1) + ' s (mediana) contro ' + (x.opMs / 1000).toFixed(1) +
-        ' s per le ' + MM.OPNAME[x.tag.charAt(0)] + ' in generale' + (x.slip >= 0.2 ? ', ' + Math.round(x.slip * 100) + '% con errori' : '') + ' · ' + x.n + ' domande</small></span>' +
+      return '<div class="gap"><span><b>' + esc(MM.label(x.tag)) + '</b><br><small>' + (x.ms / 1000).toFixed(1) + ' s (mediana), ' + Math.round((x.ratio - 1) * 100) + '% più lento di ' + MM.OPNAME[x.tag.charAt(0)] + ' con risultati della stessa lunghezza' + (x.slip >= 0.2 ? ', ' + Math.round(x.slip * 100) + '% con errori' : '') + ' · ' + x.n + ' domande</small></span>' +
         '<button class="primary" data-drill="' + esc(x.tag) + '">Allenati</button></div>';
     }).join('');
   }

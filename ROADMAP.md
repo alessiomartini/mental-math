@@ -17,7 +17,7 @@
 
 ## Decisioni e cose provate
 - Dati nel `localStorage`, niente account: zero attrito e nessun dato personale su un server; limite: un solo browser, si perde se si cancellano i dati del sito (mitigato con `navigator.storage.persist()` ed Esporta). La sincronizzazione è in Idee.
-- Le lacune confrontano tipi simili (×7 contro tutte le ×; addizioni con 2 riporti contro tutte le addizioni), perché il tempo grezzo misura soprattutto la grandezza dei numeri. Gli errori di battitura contano da soli solo con n ≥ 20 (sono rumorosi).
+- Le lacune confrontano tipi simili: ogni tempo viene prima diviso per la mediana delle domande con la stessa operazione e la stessa lunghezza del risultato (il tempo grezzo misura soprattutto la grandezza dei numeri, e le modalità mescolano numeri piccoli e grandi), poi si confrontano i tag (×7, addizioni con 2 riporti, decimali...) su quel rapporto. Gli errori di battitura contano da soli solo con n ≥ 20 (sono rumorosi).
 - Evidenza: la pratica mirata sui fatti lenti e il recupero ripetuto funzionano soprattutto negli studi su bambini; sugli adulti l'evidenza è debole.
 - Il nome Zetamac non si usa: la modalità di riferimento si chiama "Classica".
 
