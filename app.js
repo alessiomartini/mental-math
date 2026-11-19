@@ -144,13 +144,20 @@
   }
   function renderStats() {
     $('#gaps-full').innerHTML = gapsHtml(20) || '<p class="muted">Nessuna lacuna trovata (o pochi dati: gioca ancora).</p>';
-    // modes, most recent first
-    var keys = [], names = {};
-    db.sessions.slice().reverse().forEach(function (s) { if (keys.indexOf(s.key) < 0) { keys.push(s.key); names[s.key] = s.name; } });
-    var pick = $('#mode-pick'), was = pick.value;
-    pick.innerHTML = keys.map(function (k) { return '<option value="' + esc(k) + '">' + esc(names[k]) + ' (' + db.sessions.filter(function (s) { return s.key === k; }).length + ')</option>'; }).join('');
-    if (keys.indexOf(was) >= 0) pick.value = was;
-    renderMode();
+    // every mode on one page, most recent first: summary table, then one chart + game list per mode
+    var keys = [], last = {};
+    db.sessions.slice().reverse().forEach(function (s) { if (keys.indexOf(s.key) < 0) { keys.push(s.key); last[s.key] = s; } });
+    var count = function (k) { return db.sessions.filter(function (s) { return s.key === k; }).length; };
+    keys.sort(function (a, b) { return count(b) - count(a); }); // most played first
+    playCfgs = keys.map(function (k) { return last[k].cfg; });
+    var mean = function (a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; };
+    var rows = keys.map(function (k, i) {
+      var sc = db.sessions.filter(function (s) { return s.key === k; }).map(function (s) { return s.score; });
+      return '<tr><td><a href="#m' + i + '">' + esc(last[k].name) + '</a></td><td>' + sc.length + '</td><td>' + sc[sc.length - 1] + '</td><td>' +
+        mean(sc.slice(-10)).toFixed(1) + '</td><td>' + Math.max.apply(null, sc) + '</td><td><button data-play="' + i + '">Gioca</button></td></tr>';
+    }).join('');
+    $('#summary').innerHTML = rows ? '<table><tr><th>Modalità</th><th>Partite</th><th>Ultima</th><th title="Media delle ultime 10 partite">Media 10</th><th>Record</th><th></th></tr>' + rows + '</table>' : '<p class="muted">Ancora nessuna partita.</p>';
+    $('#modes').innerHTML = keys.map(function (k, i) { return modeHtml(k, i, last[k].name); }).join('');
     // per operation
     var ops = ['+', '-', '×', '÷'].map(function (op) {
       var l = db.qs.filter(function (q) { return q.op === op; }).slice(-1000);
@@ -160,11 +167,12 @@
     }).join('');
     $('#ops').innerHTML = ops ? '<table><tr><th>Op.</th><th>Domande (ultime 1000)</th><th>Tempo mediano</th><th>Con errori</th></tr>' + ops + '</table>' : '<p class="muted">Ancora nessun dato.</p>';
   }
-  function renderMode() {
-    var k = $('#mode-pick').value, ss = db.sessions.filter(function (s) { return s.key === k; });
-    if (!ss.length) { $('#chart').innerHTML = ''; $('#sessions').innerHTML = '<p class="muted">Ancora nessuna partita.</p>'; return; }
+  var playCfgs = [];
+  document.addEventListener('click', function (e) { var b = e.target.closest('[data-play]'); if (b) start(playCfgs[b.dataset.play]); });
+  function modeHtml(k, idx, name) {
+    var ss = db.sessions.filter(function (s) { return s.key === k; });
     // single series: score per game, in order. One axis, thin line, markers with native tooltip.
-    var W = 640, H = 200, L = 34, B = 22, T = 10, max = Math.max.apply(null, ss.map(function (s) { return s.score; })) || 1;
+    var W = 640, H = ss.length > 10 ? 180 : 120, L = 34, B = 22, T = 14, max = Math.max.apply(null, ss.map(function (s) { return s.score; })) || 1;
     var x = function (i) { return L + (ss.length === 1 ? (W - L - 10) / 2 : i * (W - L - 10) / (ss.length - 1)); };
     var y = function (v) { return T + (H - T - B) * (1 - v / max); };
     var pts = ss.map(function (s, i) { return [x(i), y(s.score), s]; });
@@ -172,22 +180,20 @@
     var days = [], cur = null;
     ss.forEach(function (s, i) { var d = s.t.slice(0, 10); if (!cur || cur.d !== d) days.push(cur = { d: d, i: [], sum: 0 }); cur.i.push(i); cur.sum += s.score; });
     var line = days.map(function (d) { return [x((d.i[0] + d.i[d.i.length - 1]) / 2), y(d.sum / d.i.length)]; });
-    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Punteggi nel tempo">' +
+    var svg = '<svg' + (line.length > 1 ? '' : ' class="solo"') + ' viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Punteggi nel tempo">' +
       '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>' +
       '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(max) + '" y2="' + y(max) + '"/>' +
       '<text x="' + (L - 6) + '" y="' + (y(0) + 4) + '" text-anchor="end">0</text><text x="' + (L - 6) + '" y="' + (y(max) + 4) + '" text-anchor="end">' + max + '</text>' +
       '<text x="' + L + '" y="' + (H - 4) + '">partita 1</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" text-anchor="end">partita ' + ss.length + '</text>' +
       pts.map(function (p) { return '<circle class="game" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3"><title>' + p[2].t.slice(0, 10) + ': ' + p[2].score + '</title></circle>'; }).join('') +
       (line.length > 1 ? '<path d="M' + line.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join('L') + '"/>' : '') +
-      '<text x="' + (W - 10) + '" y="' + (T + 2) + '" text-anchor="end">linea: media del giorno · punti: partite</text>' +
       '</svg>';
-    $('#chart').innerHTML = svg;
-    $('#sessions').innerHTML = '<table><tr><th>Data</th><th>Punti</th></tr>' + ss.slice().reverse().slice(0, 30).map(function (s) {
+    var list = '<details><summary>Tutte le partite (' + ss.length + ')</summary><table><tr><th>Data</th><th>Punti</th></tr>' + ss.slice().reverse().map(function (s) {
       // imported games have no real time of day: date only
       return '<tr><td>' + esc(new Date(s.t).toLocaleString('it-IT', s.src ? { dateStyle: 'short' } : { dateStyle: 'short', timeStyle: 'short' })) + (s.src ? ' <small>(importata)</small>' : '') + '</td><td>' + s.score + '</td></tr>';
-    }).join('') + '</table>';
+    }).join('') + '</table></details>';
+    return '<div class="mode" id="m' + idx + '"><h3>' + esc(name) + '</h3>' + svg + list + '</div>';
   }
-  $('#mode-pick').addEventListener('change', renderMode);
 
   $('#export').addEventListener('click', function () {
     var a = document.createElement('a');
