@@ -168,17 +168,23 @@
     var x = function (i) { return L + (ss.length === 1 ? (W - L - 10) / 2 : i * (W - L - 10) / (ss.length - 1)); };
     var y = function (v) { return T + (H - T - B) * (1 - v / max); };
     var pts = ss.map(function (s, i) { return [x(i), y(s.score), s]; });
+    // line = mean of each day (at the day's middle game), dots = single games: one day's scores are noisy
+    var days = [], cur = null;
+    ss.forEach(function (s, i) { var d = s.t.slice(0, 10); if (!cur || cur.d !== d) days.push(cur = { d: d, i: [], sum: 0 }); cur.i.push(i); cur.sum += s.score; });
+    var line = days.map(function (d) { return [x((d.i[0] + d.i[d.i.length - 1]) / 2), y(d.sum / d.i.length)]; });
     var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Punteggi nel tempo">' +
       '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>' +
       '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(max) + '" y2="' + y(max) + '"/>' +
       '<text x="' + (L - 6) + '" y="' + (y(0) + 4) + '" text-anchor="end">0</text><text x="' + (L - 6) + '" y="' + (y(max) + 4) + '" text-anchor="end">' + max + '</text>' +
       '<text x="' + L + '" y="' + (H - 4) + '">partita 1</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" text-anchor="end">partita ' + ss.length + '</text>' +
-      (pts.length > 1 ? '<path d="M' + pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join('L') + '"/>' : '') +
-      pts.map(function (p) { return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4"><title>' + p[2].t.slice(0, 16).replace('T', ' ') + ': ' + p[2].score + '</title></circle>'; }).join('') +
+      pts.map(function (p) { return '<circle class="game" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3"><title>' + p[2].t.slice(0, 10) + ': ' + p[2].score + '</title></circle>'; }).join('') +
+      (line.length > 1 ? '<path d="M' + line.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join('L') + '"/>' : '') +
+      '<text x="' + (W - 10) + '" y="' + (T + 2) + '" text-anchor="end">linea: media del giorno · punti: partite</text>' +
       '</svg>';
     $('#chart').innerHTML = svg;
     $('#sessions').innerHTML = '<table><tr><th>Data</th><th>Punti</th></tr>' + ss.slice().reverse().slice(0, 30).map(function (s) {
-      return '<tr><td>' + esc(new Date(s.t).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })) + '</td><td>' + s.score + '</td></tr>';
+      // imported games have no real time of day: date only
+      return '<tr><td>' + esc(new Date(s.t).toLocaleString('it-IT', s.src ? { dateStyle: 'short' } : { dateStyle: 'short', timeStyle: 'short' })) + (s.src ? ' <small>(importata)</small>' : '') + '</td><td>' + s.score + '</td></tr>';
     }).join('') + '</table>';
   }
   $('#mode-pick').addEventListener('change', renderMode);

@@ -32,5 +32,5 @@ th { color: var(--muted); font-weight: 500; }
 #chart .ax { stroke: var(--line); }
 #chart text { fill: var(--muted); font-size: 11px; }
 #chart path { stroke: var(--accent); stroke-width: 2; fill: none; }
-#chart circle { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
-#chart circle:hover { r: 6; }
+#chart circle { fill: var(--accent); opacity: .35; }
+#chart circle:hover { r: 6; opacity: 1; }
