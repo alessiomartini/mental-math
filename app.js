@@ -82,17 +82,25 @@
   var game = null, input = $('#answer');
   function start(cfg) {
     game = { cfg: cfg, score: 0, qs: [], end: Date.now() + cfg.dur * 1000, q: null, shown: 0, slip: false };
+    if (cfg.test) { game.queue = MM.testQueue(); game.total = game.queue.length; }
     show('play'); input.value = ''; input.focus();
     $('#score').textContent = 0;
+    $('#tlabel').textContent = cfg.test ? 'Domanda' : 'Tempo:';
+    $('#skip-row').hidden = !cfg.test;
     next(); tick();
   }
   function next() {
-    game.q = MM.nextQ(game.cfg); game.shown = performance.now(); game.slip = false;
+    if (game.queue) {
+      if (!game.queue.length) return finish();
+      game.q = game.queue.shift();
+      $('#time').textContent = (game.total - game.queue.length) + '/' + game.total;
+    } else game.q = MM.nextQ(game.cfg);
+    game.shown = performance.now(); game.slip = false;
     $('#question').textContent = game.q.x + ' ' + (game.q.op === '-' ? '−' : game.q.op) + ' ' + game.q.y;
     input.value = '';
   }
   function tick() {
-    if (!game) return;
+    if (!game || game.queue) return; // the test has no time limit
     var left = Math.max(0, Math.ceil((game.end - Date.now()) / 1000));
     $('#time').textContent = left;
     if (left <= 0) return finish();
@@ -101,15 +109,28 @@
   input.addEventListener('input', function () {
     if (!game) return;
     var q = game.q;
-    if (MM.isRight(input.value, q.ans)) {
-      game.qs.push({ op: q.op, x: q.x, y: q.y, al: q.al, ms: Math.round(performance.now() - game.shown), slip: game.slip, tags: q.tags });
-      game.score++; $('#score').textContent = game.score;
-      next();
-    } else if (!MM.isPrefix(input.value, q.ans)) game.slip = true;
+    if (MM.isRight(input.value, q.ans)) record(false);
+    else if (!MM.isPrefix(input.value, q.ans)) game.slip = true;
   });
-  input.addEventListener('keydown', function (e) { if (e.key === 'Escape' && game) { game = null; show('home'); } });
+  function record(skip) {
+    var q = game.q, r = { op: q.op, x: q.x, y: q.y, al: q.al, ms: Math.round(performance.now() - game.shown), slip: game.slip || skip, tags: q.tags };
+    if (q.skill) r.skill = q.skill;
+    if (skip) r.skip = true; else { game.score++; $('#score').textContent = game.score; }
+    game.qs.push(r);
+    next();
+  }
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && game) { game = null; show('home'); }
+    if (e.key === 'Enter' && game && game.queue) record(true);
+  });
+  $('#skip').addEventListener('click', function () { if (game && game.queue) { record(true); input.focus(); } });
+  $('#start-test').addEventListener('click', function () { start({ test: true, name: 'Test delle abilità', dur: 0 }); });
   function finish() {
     var g = game; game = null;
+    var sk = g.cfg.test && MM.skillScores(g.qs, 99);
+    // test score = mean of the 7 skill scores (0-100)
+    if (sk) g.score = Math.round(sk.reduce(function (a, s) { return a + (s.score || 0); }, 0) / sk.length);
+    $('#res-radar').innerHTML = sk ? radarSvg(sk) + skillTable(sk) : '';
     var key = MM.modeKey(g.cfg), prev = db.sessions.filter(function (s) { return s.key === key; });
     var best = prev.reduce(function (m, s) { return Math.max(m, s.score); }, 0);
     var id = Date.now();
@@ -117,7 +138,7 @@
     g.qs.forEach(function (q) { q.s = id; db.qs.push(q); });
     save();
     lastCfg = g.cfg;
-    $('#res-score').textContent = 'Punteggio: ' + g.score;
+    $('#res-score').textContent = g.cfg.test ? 'Indice delle abilità: ' + g.score + '/100' : 'Punteggio: ' + g.score;
     var slips = g.qs.filter(function (q) { return q.slip; }).length;
     $('#res-detail').textContent = g.cfg.name + '. ' + (prev.length ? (g.score > best ? 'Nuovo record (prima ' + best + ').' : 'Record: ' + best + '.') : 'Prima partita in questa modalità.') +
       (g.qs.length ? ' Tempo mediano ' + (MM.median(g.qs.map(function (q) { return q.ms; })) / 1000).toFixed(1) + ' s per domanda, ' + slips + ' con errori di battitura.' : '');
@@ -138,11 +159,49 @@
         '<button class="primary" data-drill="' + esc(x.tag) + '">Allenati</button></div>';
     }).join('');
   }
+  // Radar (spider) chart: one axis per skill, 0 at the centre, 100 on the outer ring.
+  // Single series: no legend; grid rings at 25/50/75/100; skills without data get a muted "n/d" label.
+  function radarSvg(sk) {
+    var S = 360, C = S / 2, R = 120, n = sk.length;
+    var pt = function (i, v) { var a = -Math.PI / 2 + 2 * Math.PI * i / n; return [C + R * v / 100 * Math.cos(a), C + R * v / 100 * Math.sin(a)]; };
+    var poly = function (vals) { return vals.map(function (v, i) { var p = pt(i, v); return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '); };
+    var g = [25, 50, 75, 100].map(function (v) { return '<polygon class="ring" points="' + poly(sk.map(function () { return v; })) + '"/>'; }).join('') +
+      sk.map(function (s, i) { var p = pt(i, 100); return '<line class="ax" x1="' + C + '" y1="' + C + '" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '"/>'; }).join('') +
+      '<text class="tick" x="' + (C + 3) + '" y="' + (C - R / 2 + 4) + '">50</text><text class="tick" x="' + (C + 3) + '" y="' + (C - R + 4) + '">100</text>';
+    var has = sk.filter(function (s) { return s.score != null; }).length;
+    var area = has >= 3 ? '<polygon class="area" points="' + poly(sk.map(function (s) { return s.score || 0; })) + '"/>' : '';
+    var dots = sk.map(function (s, i) {
+      if (s.score == null) return '';
+      var p = pt(i, s.score); return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4"><title>' + esc(s.name) + ': ' + s.score + '</title></circle>';
+    }).join('');
+    var labels = sk.map(function (s, i) {
+      var p = pt(i, 128), anchor = Math.abs(p[0] - C) < 5 ? 'middle' : p[0] > C ? 'start' : 'end';
+      return '<text class="lbl' + (s.score == null ? ' nd' : '') + '" x="' + p[0].toFixed(1) + '" y="' + (p[1] + (p[1] < C ? -2 : 10)).toFixed(1) + '" text-anchor="' + anchor + '">' +
+        esc(s.name) + ' ' + (s.score == null ? 'n/d' : s.score) + '</text>';
+    }).join('');
+    return '<svg class="radar" viewBox="-90 0 ' + (S + 180) + ' ' + S + '" role="img" aria-label="Abilità">' + g + area + dots + labels + '</svg>';
+  }
+  // Table view of the same numbers, with a drill for the weakest skills.
+  function skillTable(sk) {
+    var weak = sk.filter(function (s) { return s.score != null && s.score < 100; }).sort(function (a, b) { return a.score - b.score; }).slice(0, 2).map(function (s) { return s.id; });
+    return '<div class="scroll"><table class="skills"><tr><th>Abilità</th><th>Punti</th><th>Mediana</th><th>N</th><th></th></tr>' + sk.map(function (s) {
+      return '<tr><td>' + esc(s.name) + '</td><td>' + (s.score == null ? 'n/d' : s.score) + '</td><td>' + (s.ms ? (s.ms / 1000).toFixed(1) + ' s' : '') + '</td><td>' + s.n + '</td><td>' +
+        (weak.indexOf(s.id) >= 0 ? '<button class="primary" data-skill="' + s.id + '">Allenati</button>' : '') + '</td></tr>';
+    }).join('') + '</table></div>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-skill]'); if (!b) return;
+    var s = MM.SKILLS.filter(function (x) { return x.id === b.dataset.skill; })[0];
+    var c = JSON.parse(JSON.stringify(s.cfg)); c.dur = 120; c.name = 'Allenamento: ' + s.name.toLowerCase();
+    setForm(c); show('home'); $('#cfg button[type=submit]').focus();
+  });
   function renderHome() {
     var h = gapsHtml(3);
     $('#gaps-short').innerHTML = h ? '<h2>Da migliorare</h2>' + h : (db.sessions.length ? '' : '<p class="muted">Gioca qualche partita: il sito trova da solo dove sei più lento e ti propone esercizi mirati.</p>');
   }
   function renderStats() {
+    var sk = MM.skillScores(db.qs, 40);
+    $('#radar').innerHTML = sk.some(function (s) { return s.score != null; }) ? radarSvg(sk) + skillTable(sk) : '<p class="muted">Ancora pochi dati: fai il test delle abilità.</p>';
     $('#gaps-full').innerHTML = gapsHtml(20) || '<p class="muted">Nessuna lacuna trovata (o pochi dati: gioca ancora).</p>';
     // every mode on one page, most recent first: summary table, then one chart + game list per mode
     var keys = [], last = {};

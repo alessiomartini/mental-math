@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mental Math: calcolo veloce</title>
 <meta name="description" content="Allenamento di calcolo mentale a tempo con statistiche automatiche e esercizi mirati sulle tue lacune.">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=6">
 <script>try { var t = localStorage.getItem('mm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
@@ -16,6 +16,7 @@
 
 <main>
 <section id="home">
+  <div class="test-box"><div><b>Test delle abilità</b><br><small>42 domande, 6 per ognuna delle 7 abilità, senza limite di tempo: misura dove sei forte e dove no. Rifallo ogni settimana per vedere i progressi.</small></div><button class="primary" id="start-test">Inizia il test</button></div>
   <div id="gaps-short"></div>
   <h2>Modalità</h2>
   <div id="presets" class="row"></div>
@@ -39,19 +40,24 @@
 </section>
 
 <section id="play" hidden>
-  <div class="row bar"><span>Tempo: <b id="time"></b></span><span>Punti: <b id="score">0</b></span></div>
+  <div class="row bar"><span><span id="tlabel">Tempo:</span> <b id="time"></b></span><span>Punti: <b id="score">0</b></span></div>
   <div id="question"></div>
   <input id="answer" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Risposta">
   <p class="muted">La risposta giusta passa da sola alla prossima. Esc per uscire senza salvare.</p>
+  <p id="skip-row" hidden><button id="skip" type="button">Salta (Invio)</button> <small class="muted">nel test: se una domanda ti blocca, saltala; conta come lenta.</small></p>
 </section>
 
 <section id="result" hidden>
   <h2 id="res-score"></h2>
   <p id="res-detail"></p>
+  <div id="res-radar"></div>
   <div class="row"><button class="primary" id="again">Ancora</button><button data-go="stats">Statistiche</button><button data-go="home">Modalità</button></div>
 </section>
 
 <section id="stats" hidden>
+  <h2>Abilità</h2>
+  <p class="muted">Ogni vertice è un'abilità: al centro = lento, sul bordo = veloce come un buon candidato a un colloquio quant (100). Calcolato sulle ultime 40 domande di ogni abilità, da tutte le partite.</p>
+  <div id="radar"></div>
   <h2>Riepilogo</h2>
   <div id="summary"></div>
   <h2>Lacune</h2>
@@ -68,8 +74,8 @@
 </section>
 </main>
 
-<script src="core.js?v=2"></script>
-<script src="app.js?v=5"></script>
+<script src="core.js?v=3"></script>
+<script src="app.js?v=7"></script>
 <script src="notes-widget.js?v=2" data-site="mental-math"></script>
 </body>
 </html>

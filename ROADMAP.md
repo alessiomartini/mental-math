@@ -8,6 +8,8 @@
 - [x] Grafico dei punteggi per modalità, statistiche per operazione
 - [x] Feedback (site-notes), tema chiaro/scuro
 - [x] Importati i punteggi passati di Zetamac dal foglio Google (215 partite, solo punteggi: niente tempi per domanda, quindi non entrano nell'analisi delle lacune)
+- [x] Test delle abilità (42 domande, 6 per 7 abilità, senza tempo, con Salta) e grafico radar delle abilità nelle statistiche
+- [ ] Tarare i tempi obiettivo delle abilità tabelline, numeri grandi e decimali (ora stime)
 - [ ] Giocare qualche settimana e tarare le soglie delle lacune (ora: n ≥ 10, mediana ≥ 1,25× la propria operazione)
 
 ## Idee
@@ -20,7 +22,9 @@
 - Dati nel `localStorage`, niente account: zero attrito e nessun dato personale su un server; limite: un solo browser, si perde se si cancellano i dati del sito (mitigato con `navigator.storage.persist()` ed Esporta). La sincronizzazione è in Idee.
 - Le lacune confrontano tipi simili: ogni tempo viene prima diviso per la mediana delle domande con la stessa operazione e la stessa lunghezza del risultato (il tempo grezzo misura soprattutto la grandezza dei numeri, e le modalità mescolano numeri piccoli e grandi), poi si confrontano i tag (×7, addizioni con 2 riporti, decimali...) su quel rapporto. Gli errori di battitura contano da soli solo con n ≥ 20 (sono rumorosi).
 - Evidenza: la pratica mirata sui fatti lenti e il recupero ripetuto funzionano soprattutto negli studi su bambini; sugli adulti l'evidenza è debole.
+- Punteggio di un'abilità = tempo obiettivo / tempo mediano sulle ultime 40 domande, max 100. Obiettivi di addizioni, sottrazioni, moltiplicazioni e divisioni dal foglio di Alessio (quelli per arrivare a 45+ nella Classica); tabelline, numeri grandi e decimali stimati. Gli errori non entrano nel punteggio (restano in tabella e nelle lacune). Il radar usa tutte le partite, non solo i test; il test serve a coprire tutte le abilità in modo uniforme.
 - Il nome Zetamac non si usa: la modalità di riferimento si chiama "Classica".
 
 ## Log
+- 2026-11-20: modalità Test delle abilità e grafico radar delle 7 abilità, con allenamento sulle 2 più deboli.
 - 2026-11-19: progetto avviato (dal task Google "fare reverse-engineer con zetamac"): MVP completo e pubblicato; lacune normalizzate per lunghezza del risultato; import dei punteggi passati (file in Dati-personali, non nel repo), grafico con la media del giorno; statistiche su un'unica pagina (riepilogo di tutte le modalità con "Gioca", un grafico per modalità); moduli leggibili su mobile.

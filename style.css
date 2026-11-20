@@ -43,3 +43,15 @@ details summary { cursor: pointer; color: var(--muted); }
 #summary { overflow-x: auto; }
 @media (max-width: 520px) { #summary table { font-size: .85rem; } #summary th, #summary td { padding: .25rem .3rem; } }
 .mode svg.solo circle { opacity: 1; }
+.test-box { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: .7rem .9rem; margin: .4rem 0 1rem; background: var(--card); }
+.radar { width: 100%; max-width: 520px; height: auto; display: block; margin: .5rem auto; }
+.radar .ring { fill: none; stroke: var(--line); }
+.radar .ax { stroke: var(--line); }
+.radar .area { fill: var(--accent); fill-opacity: .22; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.radar circle { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+.radar text { fill: var(--fg); font-size: 15px; }
+.radar .tick, .radar .nd { fill: var(--muted); font-size: 12px; }
+.skills td button { padding: .1rem .5rem; }
+
+.scroll { overflow-x: auto; }
+@media (max-width: 520px) { .skills { font-size: .85rem; } .skills th, .skills td { padding: .25rem .3rem; } }
