@@ -57,9 +57,24 @@
     var t = [q.op];
     if (q.op === '+') t.push('+c' + Math.min(q.c, 3));
     if (q.op === '-') t.push('-b' + Math.min(q.c, 3));
-    if (q.op === '×' || q.op === '÷') t.push(q.op + (q.f <= 20 ? q.f : '21+'));
+    if (q.op === '×' || q.op === '÷') t = t.concat(d ? [q.op + (q.f <= 20 ? q.f : '21+')] : mdTags(q.op, q.f, Number(q.op === '×' ? q.y : q.ans)));
     if (d) t.push(q.op + 'dec');
     return t;
+  }
+  // × and ÷ (f = small factor, m = other factor / quotient). Tables (m <= 12) are tagged by factor;
+  // beyond tables what makes them slow is the carry from units into tens (Alessio's data, 2026-11-20:
+  // 3.4 s without carry, 6-8 s with carry 2-5, while the factor itself barely matters), so they are tagged by carry.
+  function mdTags(op, f, m) {
+    if (f > 20) return [op + '21+'];
+    if (m <= 12) return [op + f];
+    var c = Math.floor(f * (m % 10) / 10);
+    return [op + 'r' + (c === 0 ? 0 : c < 4 ? 1 : 2)];
+  }
+  // Tags recomputed from the operands, so old logged questions follow the current tagging.
+  function tagsFor(q) {
+    if ((q.op !== '×' && q.op !== '÷') || q.x === undefined || /\./.test(q.x + q.y)) return q.tags;
+    var x = Number(q.x), y = Number(q.y), f = q.op === '×' ? x : y, m = q.op === '×' ? y : x / y;
+    return [q.op].concat(mdTags(q.op, f, m));
   }
 
   // Draws until the question carries cfg.focus (if set). ponytail: rejection sampling, fine for these ranges.
@@ -89,7 +104,7 @@
     qs.forEach(function (q) { (groups[gk(q)] = groups[gk(q)] || []).push(q.ms); });
     var gm = {}; Object.keys(groups).forEach(function (k) { gm[k] = median(groups[k]); });
     var byTag = {};
-    qs.forEach(function (q) { q.tags.forEach(function (t) { (byTag[t] = byTag[t] || []).push(q); }); });
+    qs.forEach(function (q) { tagsFor(q).forEach(function (t) { (byTag[t] = byTag[t] || []).push(q); }); });
     var out = [];
     Object.keys(byTag).forEach(function (t) {
       var op = t.charAt(0), list = byTag[t], base = byTag[op];
@@ -109,6 +124,8 @@
   function label(t) {
     var op = t.charAt(0), rest = t.slice(1);
     if (rest === 'dec') return OPNAME[op] + ' con la virgola';
+    if (/^r\d$/.test(rest)) return (op === '×' ? 'moltiplicazioni 1×2 cifre ' : 'divisioni con quoziente a 2 cifre ') +
+      ['senza riporto', 'con riporto piccolo (1–3)', 'con riporto grande (4–8)'][rest.charAt(1)];
     if (op === '+') return 'addizioni con ' + rest.slice(1) + (rest.slice(1) === '3' ? '+' : '') + ' riporti';
     if (op === '-') return 'sottrazioni con ' + rest.slice(1) + (rest.slice(1) === '3' ? '+' : '') + ' prestiti';
     return (op === '×' ? 'moltiplicazioni per ' : 'divisioni per ') + rest;
@@ -126,6 +143,7 @@
     } else {
       if (op === '×') c.mul.on = true; else c.div = true;
       if (rest === 'dec') { c.dec = 1; }
+      else if (/^r\d$/.test(rest)) { c.mul.a = [2, 12]; c.mul.b = [13, 99]; c.focus = t; }
       else if (rest === '21+') { c.mul.a = [21, 99]; c.mul.b = [2, 12]; }
       else { c.mul.a = [Number(rest), Number(rest)]; c.mul.b = [2, 100]; c.mul.on = true; c.div = true; c.name = 'Allenamento: tabellina del ' + rest + ' (× e ÷)'; }
     }

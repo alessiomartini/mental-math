@@ -54,4 +54,10 @@ const sc = M.skillScores([...Array(10)].map(() => ({ skill: 'add', ms: 1800 })).
 assert.strictEqual(sc.find(s => s.id === 'add').score, 100);
 assert.strictEqual(sc.find(s => s.id === 'tab').score, 50);
 assert.strictEqual(sc.find(s => s.id === 'dec').score, null);
+// carry tags for 1-digit x 2-digit: 7×86 (7×6=42 -> carry 4), 3×21 (no carry), tables tagged by factor
+const r2 = M.drill('×r2');
+for (let i = 0; i < 200; i++) { const q = M.nextQ(r2); assert.ok(Math.floor(Number(q.x) * (Number(q.y) % 10) / 10) >= 4, q.x + 'x' + q.y); }
+const r0d = M.drill('÷r0');
+for (let i = 0; i < 100; i++) { const q = M.nextQ(r0d); assert.strictEqual(q.op, '÷'); assert.ok(q.tags.includes('÷r0')); }
+assert.ok(M.nextQ(M.PRESETS.tabelline).tags.some(t => /^[×÷]\d+$/.test(t)));
 console.log('ok');
