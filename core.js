@@ -134,10 +134,55 @@
 
   // Sessions with the same key had the same rules, so their scores are comparable.
   function modeKey(c) {
+    if (c.test) return '"test"';
     var as = c.add.on || c.sub, md = c.mul.on || c.div;
     return JSON.stringify([c.dur, c.dec || 0, c.add.on, c.sub, as && c.add.a, as && c.add.b, c.mul.on, c.div, md && c.mul.a, md && c.mul.b, c.focus || '']);
   }
 
-  var api = { PRESETS: PRESETS, OPNAME: OPNAME, fmt: fmt, carries: carries, makeQ: makeQ, nextQ: nextQ, isRight: isRight, isPrefix: isPrefix, analyse: analyse, label: label, drill: drill, modeKey: modeKey, median: median };
+  // ---------- skills (radar axes) and the diagnostic test ----------
+  // target = median time (ms) of a fast quant-interview candidate. add/sub/mul/div from the targets in
+  // Alessio's Zetamac sheet (to reach 45+ in Classica); tab/big/dec are estimates, to tune with real data.
+  function cfgOf(o) { return Object.assign({ dur: 0, dec: 0, add: { on: false, a: [2, 100], b: [2, 100] }, sub: false, mul: { on: false, a: [2, 12], b: [2, 100] }, div: false }, o); }
+  var SKILLS = [
+    { id: 'add', name: 'Addizioni', target: 1800, cfg: cfgOf({ add: { on: true, a: [2, 100], b: [2, 100] } }) },
+    { id: 'sub', name: 'Sottrazioni', target: 2000, cfg: cfgOf({ sub: true }) },
+    { id: 'tab', name: 'Tabelline', target: 1000, cfg: cfgOf({ mul: { on: true, a: [2, 12], b: [2, 12] } }) },
+    { id: 'mul', name: 'Molt. 1×2 cifre', target: 2800, cfg: cfgOf({ mul: { on: true, a: [2, 12], b: [13, 100] } }) },
+    { id: 'div', name: 'Divisioni', target: 2400, cfg: cfgOf({ div: true }) },
+    { id: 'big', name: 'Numeri grandi', target: 3500, cfg: cfgOf({ add: { on: true, a: [101, 999], b: [10, 999] }, sub: true }) },
+    { id: 'dec', name: 'Decimali', target: 3000, cfg: cfgOf({ dec: 1, add: { on: true, a: [2, 100], b: [2, 100] }, sub: true, mul: { on: true, a: [2, 12], b: [2, 100] }, div: true }) }
+  ];
+  // Classifies any logged question (also from normal games) into one skill.
+  function skillOf(q) {
+    var x = Number(q.x), y = Number(q.y);
+    if (q.tags && q.tags.some(function (t) { return /dec$/.test(t); })) return 'dec';
+    if (q.op === '+') return Math.max(x, y) > 100 ? 'big' : 'add';
+    if (q.op === '-') return y > 100 || x - y > 100 ? 'big' : 'sub';
+    if (q.op === '×') { var f = Math.min(x, y), m = Math.max(x, y); return f > 12 ? 'big' : m <= 12 ? 'tab' : 'mul'; }
+    return y > 12 ? 'big' : 'div';
+  }
+  var PER_SKILL = 6;
+  // Test: PER_SKILL questions per skill, shuffled, no time limit.
+  function testQueue(r) {
+    var q = [];
+    SKILLS.forEach(function (s) { for (var i = 0; i < PER_SKILL; i++) { var x = nextQ(s.cfg, r); x.skill = s.id; q.push(x); } });
+    for (var i = q.length - 1; i > 0; i--) { var j = rnd(0, i, r), t = q[i]; q[i] = q[j]; q[j] = t; }
+    return q;
+  }
+  // Skill score 0-100 = target / median time over the last `last` questions of that skill (capped at 100).
+  // Skipped questions count with their (long) time. null = fewer than 5 questions.
+  function skillScores(qs, last) {
+    var by = {};
+    qs.forEach(function (q) { var s = q.skill || skillOf(q); (by[s] = by[s] || []).push(q); });
+    return SKILLS.map(function (s) {
+      var l = (by[s.id] || []).slice(-(last || 40));
+      if (l.length < 5) return { id: s.id, name: s.name, n: l.length, score: null };
+      var med = median(l.map(function (q) { return q.ms; }));
+      return { id: s.id, name: s.name, n: l.length, ms: med, slip: l.filter(function (q) { return q.slip; }).length / l.length,
+        score: Math.min(100, Math.round(100 * s.target / med)) };
+    });
+  }
+
+  var api = { PRESETS: PRESETS, SKILLS: SKILLS, skillOf: skillOf, testQueue: testQueue, skillScores: skillScores, OPNAME: OPNAME, fmt: fmt, carries: carries, makeQ: makeQ, nextQ: nextQ, isRight: isRight, isPrefix: isPrefix, analyse: analyse, label: label, drill: drill, modeKey: modeKey, median: median };
   if (typeof module !== 'undefined') module.exports = api; else root.MM = api;
 })(this);

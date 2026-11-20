@@ -43,4 +43,15 @@ for (const k of ['classica', 'grandi', 'estese']) for (let i = 0; i < 3000; i++)
   big.push({ op: q.op, tags: q.tags, al: q.al, ms: 500 * q.al, slip: false });
 }
 assert.deepStrictEqual(M.analyse(big).map(g => g.tag), []);
+// test questions: every skill's generator produces questions classified as that skill
+const tq = M.testQueue();
+assert.strictEqual(tq.length, M.SKILLS.length * 6);
+for (const s of M.SKILLS) for (let i = 0; i < 500; i++) assert.strictEqual(M.skillOf(M.nextQ(s.cfg)), s.id, s.id);
+// classic questions all get a skill too
+for (let i = 0; i < 500; i++) { const k = M.skillOf(M.nextQ(M.PRESETS.classica)); assert.ok(M.SKILLS.some(s => s.id === k)); }
+// scores: at target -> 100, twice the target -> 50, too few -> null
+const sc = M.skillScores([...Array(10)].map(() => ({ skill: 'add', ms: 1800 })).concat([...Array(10)].map(() => ({ skill: 'tab', ms: 2000 }))));
+assert.strictEqual(sc.find(s => s.id === 'add').score, 100);
+assert.strictEqual(sc.find(s => s.id === 'tab').score, 50);
+assert.strictEqual(sc.find(s => s.id === 'dec').score, null);
 console.log('ok');
