@@ -228,25 +228,33 @@
   }
   var playCfgs = [];
   document.addEventListener('click', function (e) { var b = e.target.closest('[data-play]'); if (b) start(playCfgs[b.dataset.play]); });
-  function modeHtml(k, idx, name) {
-    var ss = db.sessions.filter(function (s) { return s.key === k; });
-    // single series: score per game, in order. One axis, thin line, markers with native tooltip.
-    var W = 640, H = ss.length > 10 ? 180 : 120, L = 34, B = 22, T = 14, max = Math.max.apply(null, ss.map(function (s) { return s.score; })) || 1;
+  // one series of {t, v} per game, in order: dots = single games, line = mean of each day (one day's games are noisy)
+  function chartSvg(ss, title, fmtV) {
+    var W = 640, H = ss.length > 10 ? 180 : 120, L = 40, B = 22, T = 14, max = Math.max.apply(null, ss.map(function (s) { return s.v; })) || 1;
     var x = function (i) { return L + (ss.length === 1 ? (W - L - 10) / 2 : i * (W - L - 10) / (ss.length - 1)); };
     var y = function (v) { return T + (H - T - B) * (1 - v / max); };
-    var pts = ss.map(function (s, i) { return [x(i), y(s.score), s]; });
-    // line = mean of each day (at the day's middle game), dots = single games: one day's scores are noisy
     var days = [], cur = null;
-    ss.forEach(function (s, i) { var d = s.t.slice(0, 10); if (!cur || cur.d !== d) days.push(cur = { d: d, i: [], sum: 0 }); cur.i.push(i); cur.sum += s.score; });
+    ss.forEach(function (s, i) { var d = s.t.slice(0, 10); if (!cur || cur.d !== d) days.push(cur = { d: d, i: [], sum: 0 }); cur.i.push(i); cur.sum += s.v; });
     var line = days.map(function (d) { return [x((d.i[0] + d.i[d.i.length - 1]) / 2), y(d.sum / d.i.length)]; });
-    var svg = '<svg' + (line.length > 1 ? '' : ' class="solo"') + ' viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Punteggi nel tempo">' +
+    return '<p class="muted">' + title + '</p><svg' + (line.length > 1 ? '' : ' class="solo"') + ' viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + title + '">' +
       '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>' +
       '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(max) + '" y2="' + y(max) + '"/>' +
-      '<text x="' + (L - 6) + '" y="' + (y(0) + 4) + '" text-anchor="end">0</text><text x="' + (L - 6) + '" y="' + (y(max) + 4) + '" text-anchor="end">' + max + '</text>' +
+      '<text x="' + (L - 6) + '" y="' + (y(0) + 4) + '" text-anchor="end">0</text><text x="' + (L - 6) + '" y="' + (y(max) + 4) + '" text-anchor="end">' + fmtV(max) + '</text>' +
       '<text x="' + L + '" y="' + (H - 4) + '">partita 1</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" text-anchor="end">partita ' + ss.length + '</text>' +
-      pts.map(function (p) { return '<circle class="game" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3"><title>' + p[2].t.slice(0, 10) + ': ' + p[2].score + '</title></circle>'; }).join('') +
+      ss.map(function (s, i) { return '<circle class="game" cx="' + x(i).toFixed(1) + '" cy="' + y(s.v).toFixed(1) + '" r="3"><title>' + s.t.slice(0, 10) + ': ' + fmtV(s.v) + '</title></circle>'; }).join('') +
       (line.length > 1 ? '<path d="M' + line.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join('L') + '"/>' : '') +
       '</svg>';
+  }
+  function modeHtml(k, idx, name) {
+    var ss = db.sessions.filter(function (s) { return s.key === k; });
+    // time per question: every game gives many data points, so it is less noisy than the score (Alessio, site note 2026-11-20).
+    // Median, not mean: one 80 s question would dominate a game's mean.
+    var byS = {};
+    db.qs.forEach(function (q) { if (!q.skip && q.ms) (byS[q.s] = byS[q.s] || []).push(q.ms); });
+    var tm = ss.filter(function (s) { return byS[s.id]; }).map(function (s) { return { t: s.t, v: MM.median(byS[s.id]) / 1000 }; });
+    var sec = function (v) { return v.toFixed(1) + ' s'; };
+    var svg = (tm.length ? chartSvg(tm, 'Tempo mediano a domanda (più basso è meglio)', sec) : '') +
+      (k === MM.modeKey(MM.PRESETS.classica) || !tm.length ? chartSvg(ss.map(function (s) { return { t: s.t, v: s.score }; }), 'Punti a partita', String) : '');
     var list = '<details><summary>Tutte le partite (' + ss.length + ')</summary><table><tr><th>Data</th><th>Punti</th></tr>' + ss.slice().reverse().map(function (s) {
       // imported games have no real time of day: date only
       return '<tr><td>' + esc(new Date(s.t).toLocaleString('it-IT', s.src ? { dateStyle: 'short' } : { dateStyle: 'short', timeStyle: 'short' })) + (s.src ? ' <small>(importata)</small>' : '') + '</td><td>' + s.score + '</td></tr>';
