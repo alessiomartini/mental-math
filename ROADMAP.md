@@ -9,7 +9,7 @@
 - [x] Feedback (site-notes), tema chiaro/scuro
 - [x] Importati i punteggi passati di Zetamac dal foglio Google (215 partite, solo punteggi: niente tempi per domanda, quindi non entrano nell'analisi delle lacune)
 - [x] Test delle abilità (42 domande, 6 per 7 abilità, senza tempo, con Salta) e grafico radar delle abilità nelle statistiche
-- [x] Grafici per modalità con il tempo mediano a domanda (più dati che i punti a partita); la Classica tiene anche i punti a partita (nota dal sito, 2026-11-20)
+- [x] Grafici per modalità con un punto per ogni domanda (tempo) e linea = mediana delle ultime 25; la Classica tiene anche i punti a partita (nota dal sito, 2026-11-20)
 - [ ] Tarare i tempi obiettivo delle abilità tabelline, numeri grandi e decimali (ora stime)
 - [ ] Giocare qualche settimana e tarare le soglie delle lacune (ora: n ≥ 10, mediana ≥ 1,25× la propria operazione)
 
@@ -28,7 +28,7 @@
 - Il nome Zetamac non si usa: la modalità di riferimento si chiama "Classica".
 
 ## Log
-- 2026-11-20: nota dal sito: grafici per modalità sul tempo mediano a domanda (mediana, non media: una domanda da 80 s falserebbe la partita); punti a partita solo nella Classica e nelle partite importate (che non hanno tempi).
+- 2026-11-20: nota dal sito: grafici per modalità con un punto per domanda (prima provato un punto per partita, scartato: pochi dati), asse tagliato al 95° percentile; punti a partita solo nella Classica e nelle partite importate (che non hanno tempi).
 - 2026-11-20: analisi dei primi 763 tempi: il gruppo lento è il riporto (×/÷ 1×2 cifre, + e − con 2 riporti/prestiti); × e ÷ oltre le tabelline ora classificate per riporto, con allenamenti mirati.
 - 2026-11-20: modalità Test delle abilità e grafico radar delle 7 abilità, con allenamento sulle 2 più deboli.
 - 2026-11-19: progetto avviato (dal task Google "fare reverse-engineer con zetamac"): MVP completo e pubblicato; lacune normalizzate per lunghezza del risultato; import dei punteggi passati (file in Dati-personali, non nel repo), grafico con la media del giorno; statistiche su un'unica pagina (riepilogo di tutte le modalità con "Gioca", un grafico per modalità); moduli leggibili su mobile.
