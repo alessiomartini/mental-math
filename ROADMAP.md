@@ -15,7 +15,8 @@
 - [x] Test per passi (2 domande per passo) e mai la stessa domanda due volte di fila (note dal sito 2026-11-21)
 - [x] Script di analisi in `tools/` e procedura di analisi periodica in CLAUDE.md (nota dal sito 2026-11-21)
 - [ ] Tarare i tempi di riferimento dei passi e i livelli (ora stime) con i dati di qualche settimana
-- [ ] Analisi dei dati con un export nuovo: verificare con i passi semplici le ipotesi sui riporti
+- [x] Analisi dei dati con l'export del 21/11 (risultati nel Log)
+- [ ] Verificare le ipotesi: + e − fatti a 1 cifra (mai misurati), + 2 cifre con 1 riporto rispetto a × con riporto
 - [ ] Giocare qualche settimana e tarare le soglie delle lacune (ora: n ≥ 10, mediana ≥ 1,25× la propria operazione)
 
 ## Idee
@@ -37,6 +38,7 @@
 - Il nome Zetamac non si usa: la modalità di riferimento si chiama "Classica".
 
 ## Log
+- 2026-11-21: analisi dell'export del 21/11 (1960 domande): ×/÷ oltre le tabelline, il salto è fra senza riporto e con riporto (× 2,4 → 5,4 → 6,5 s; ÷ 2,6 → 5,5 → 5,5 s), più che fra riporto piccolo e grande; × senza riporto migliorato molto con l'allenamento (3,5 → 2,2 s), tabelline × 1,48 → 1,28 s, decimali 18,6 → 9,6 s. Fatti lenti: 5×8, 6×9, 6×8, 4×9, 6×7, 3×8, 4×7, 4×8 (2,1–2,8 s contro 1,4 di mediana). ÷ tabelline più lente di × (1,8 contro 1,4 s, 16% errori). + e − hanno pochi dati (20–30 per passo) e i fatti a 1 cifra non sono mai stati misurati. Il "Tabelline 12" della nota era la finestra delle ultime 40 domande, piena dell'allenamento sul 12: risolto dalla media pesata su tutte le domande.
 - 2026-11-21: note dal sito: percorso a 21 passi, radar in secondi con livelli e barre d'errore, media pesata nel tempo, test per passi, niente domanda ripetuta, corretto l'allenamento delle tabelline, script di analisi in `tools/`.
 - 2026-11-20: nota dal sito: grafici per modalità con un punto per domanda (prima provato un punto per partita, scartato: pochi dati), asse tagliato al 95° percentile; punti a partita solo nella Classica e nelle partite importate (che non hanno tempi).
 - 2026-11-20: analisi dei primi 763 tempi: il gruppo lento è il riporto (×/÷ 1×2 cifre, + e − con 2 riporti/prestiti); × e ÷ oltre le tabelline ora classificate per riporto, con allenamenti mirati.
