@@ -94,7 +94,7 @@
       if (!game.queue.length) return finish();
       game.q = game.queue.shift();
       $('#time').textContent = (game.total - game.queue.length) + '/' + game.total;
-    } else game.q = MM.nextQ(game.cfg);
+    } else game.q = MM.nextQ(game.cfg, null, game.q);
     game.shown = performance.now(); game.slip = false;
     $('#question').textContent = game.q.x + ' ' + (game.q.op === '-' ? '−' : game.q.op) + ' ' + game.q.y;
     input.value = '';
@@ -127,10 +127,7 @@
   $('#start-test').addEventListener('click', function () { start({ test: true, name: 'Test delle abilità', dur: 0 }); });
   function finish() {
     var g = game; game = null;
-    var sk = g.cfg.test && MM.skillScores(g.qs, 99);
-    // test score = mean of the 7 skill scores (0-100)
-    if (sk) g.score = Math.round(sk.reduce(function (a, s) { return a + (s.score || 0); }, 0) / sk.length);
-    $('#res-radar').innerHTML = sk ? radarSvg(sk) + skillTable(sk) : '';
+    if (g.cfg.test) g.score = MM.testIndex(g.qs);
     var key = MM.modeKey(g.cfg), prev = db.sessions.filter(function (s) { return s.key === key; });
     var best = prev.reduce(function (m, s) { return Math.max(m, s.score); }, 0);
     var id = Date.now();
@@ -138,7 +135,8 @@
     g.qs.forEach(function (q) { q.s = id; db.qs.push(q); });
     save();
     lastCfg = g.cfg;
-    $('#res-score').textContent = g.cfg.test ? 'Indice delle abilità: ' + g.score + '/100' : 'Punteggio: ' + g.score;
+    $('#res-radar').innerHTML = g.cfg.test ? radarSvg(MM.skillScores(db.qs)) + stepTable(MM.stepScores(db.qs)) : '';
+    $('#res-score').textContent = g.cfg.test ? 'Indice delle abilità: ' + g.score + ' (100 ≈ chi fa 45 nella Classica)' : 'Punteggio: ' + g.score;
     var slips = g.qs.filter(function (q) { return q.slip; }).length;
     $('#res-detail').textContent = g.cfg.name + '. ' + (prev.length ? (g.score > best ? 'Nuovo record (prima ' + best + ').' : 'Record: ' + best + '.') : 'Prima partita in questa modalità.') +
       (g.qs.length ? ' Tempo mediano ' + (MM.median(g.qs.map(function (q) { return q.ms; })) / 1000).toFixed(1) + ' s per domanda, ' + slips + ' con errori di battitura.' : '');
@@ -159,49 +157,69 @@
         '<button class="primary" data-drill="' + esc(x.tag) + '">Allenati</button></div>';
     }).join('');
   }
-  // Radar (spider) chart: one axis per skill, 0 at the centre, 100 on the outer ring.
-  // Single series: no legend; grid rings at 25/50/75/100; skills without data get a muted "n/d" label.
+  // Radar (spider) chart on one absolute axis: seconds per question on a log scale, 15 s at the centre, 0.5 s
+  // on the edge, so faster = further out and every skill shares the same scale (Alessio's site note, 2026-11-21).
+  // Outlined polygons = reference levels (one hue, light -> dark); filled polygon = you, with ± 1 SE bars.
+  var TMAX = 15000, TMIN = 500;
+  var sec = function (ms) { return (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + ' s'; };
+  function lvName(i) { return i == null ? 'pochi dati' : i < 0 ? 'sotto Principiante' : MM.LEVELS[i].name; }
   function radarSvg(sk) {
     var S = 360, C = S / 2, R = 120, n = sk.length;
-    var pt = function (i, v) { var a = -Math.PI / 2 + 2 * Math.PI * i / n; return [C + R * v / 100 * Math.cos(a), C + R * v / 100 * Math.sin(a)]; };
-    var poly = function (vals) { return vals.map(function (v, i) { var p = pt(i, v); return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '); };
-    var g = [25, 50, 75, 100].map(function (v) { return '<polygon class="ring" points="' + poly(sk.map(function () { return v; })) + '"/>'; }).join('') +
-      sk.map(function (s, i) { var p = pt(i, 100); return '<line class="ax" x1="' + C + '" y1="' + C + '" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '"/>'; }).join('') +
-      '<text class="tick" x="' + (C + 3) + '" y="' + (C - R / 2 + 4) + '">50</text><text class="tick" x="' + (C + 3) + '" y="' + (C - R + 4) + '">100</text>';
-    var has = sk.filter(function (s) { return s.score != null; }).length;
-    var area = has >= 3 ? '<polygon class="area" points="' + poly(sk.map(function (s) { return s.score || 0; })) + '"/>' : '';
-    var dots = sk.map(function (s, i) {
-      if (s.score == null) return '';
-      var p = pt(i, s.score); return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4"><title>' + esc(s.name) + ': ' + s.score + '</title></circle>';
+    var rad = function (ms) { return Math.max(0, Math.min(1, Math.log(TMAX / ms) / Math.log(TMAX / TMIN))); };
+    var pt = function (i, f) { var a = -Math.PI / 2 + 2 * Math.PI * i / n; return [C + R * f * Math.cos(a), C + R * f * Math.sin(a)]; };
+    var xy = function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); };
+    var poly = function (f) { return sk.map(function (s, i) { return xy(pt(i, f(s))); }).join(' '); };
+    var g = [10000, 5000, 2000, 1000, 500].map(function (ms) {
+      var f = rad(ms);
+      return '<polygon class="ring" points="' + poly(function () { return f; }) + '"/>' + (ms > TMIN ? '<text class="tick" x="' + (C + 3) + '" y="' + (C - R * f - 2).toFixed(1) + '">' + sec(ms) + '</text>' : ''); // edge ring unlabelled: it would hit the top label
+    }).join('') + sk.map(function (s, i) { var p = pt(i, 1); return '<line class="ax" x1="' + C + '" y1="' + C + '" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '"/>'; }).join('');
+    var lv = MM.LEVELS.map(function (L, j) { return '<polygon class="lv lv' + j + '" points="' + poly(function (s) { return rad(s.base * L.k); }) + '"><title>' + L.name + '</title></polygon>'; }).join('');
+    var has = sk.filter(function (s) { return s.ms != null; }).length;
+    var area = has >= 3 ? '<polygon class="area" points="' + poly(function (s) { return s.ms ? rad(s.ms) : 0; }) + '"/>' : '';
+    var marks = sk.map(function (s, i) {
+      if (s.ms == null) return '';
+      var p = pt(i, rad(s.ms)), a = pt(i, rad(s.hi)), b = pt(i, rad(s.lo));
+      return '<line class="err" x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '"/>' +
+        '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4.5"><title>' + esc(s.name) + ': ' + sec(s.ms) + ' (' + sec(s.lo) + '–' + sec(s.hi) + '), ' + lvName(s.level) + ', ' + s.n + ' domande</title></circle>';
     }).join('');
     var labels = sk.map(function (s, i) {
-      var p = pt(i, 128), anchor = Math.abs(p[0] - C) < 5 ? 'middle' : p[0] > C ? 'start' : 'end';
-      return '<text class="lbl' + (s.score == null ? ' nd' : '') + '" x="' + p[0].toFixed(1) + '" y="' + (p[1] + (p[1] < C ? -2 : 10)).toFixed(1) + '" text-anchor="' + anchor + '">' +
-        esc(s.name) + ' ' + (s.score == null ? 'n/d' : s.score) + '</text>';
+      var p = pt(i, 1.07), anchor = Math.abs(p[0] - C) < 5 ? 'middle' : p[0] > C ? 'start' : 'end';
+      return '<text class="lbl' + (s.ms == null ? ' nd' : '') + '" x="' + p[0].toFixed(1) + '" y="' + (p[1] + (p[1] < C ? -2 : 10)).toFixed(1) + '" text-anchor="' + anchor + '">' +
+        esc(s.name) + ' ' + (s.ms == null ? 'n/d' : sec(s.ms)) + '</text>';
     }).join('');
-    return '<svg class="radar" viewBox="-90 0 ' + (S + 180) + ' ' + S + '" role="img" aria-label="Abilità">' + g + area + dots + labels + '</svg>';
+    var legend = '<div class="legend"><span><i class="sw you"></i>Tu (± errore standard)</span>' + MM.LEVELS.map(function (L, j) {
+      return '<span><i class="sw lv' + j + '"></i>' + L.name + ' <small>(≈' + L.classica + ' nella Classica)</small></span>';
+    }).join('') + '</div>';
+    return '<svg class="radar" viewBox="-90 0 ' + (S + 180) + ' ' + S + '" role="img" aria-label="Tempo per domanda per abilità, con i livelli di riferimento">' + g + lv + area + marks + labels + '</svg>' + legend +
+      '<p class="muted"><small>Più lontano dal centro = più veloce. Il tuo tempo è una media pesata: ogni settimana i dati vecchi contano la metà. I livelli sono stime, non norme pubblicate.</small></p>';
   }
-  // Table view of the same numbers, with a drill for the weakest skills.
-  function skillTable(sk) {
-    var weak = sk.filter(function (s) { return s.score != null && s.score < 100; }).sort(function (a, b) { return a.score - b.score; }).slice(0, 2).map(function (s) { return s.id; });
-    return '<div class="scroll"><table class="skills"><tr><th>Abilità</th><th>Punti</th><th>Mediana</th><th>N</th><th></th></tr>' + sk.map(function (s) {
-      return '<tr><td>' + esc(s.name) + '</td><td>' + (s.score == null ? 'n/d' : s.score) + '</td><td>' + (s.ms ? (s.ms / 1000).toFixed(1) + ' s' : '') + '</td><td>' + s.n + '</td><td>' +
-        (weak.indexOf(s.id) >= 0 ? '<button class="primary" data-skill="' + s.id + '">Allenati</button>' : '') + '</td></tr>';
-    }).join('') + '</table></div>';
+  // Table view: every ladder step with its time, level and a drill. ★ = next step of that operation.
+  function stepTable(st) {
+    var nxt = MM.nextSteps(st).map(function (s) { return s.id; });
+    var rows = '', last = null;
+    st.forEach(function (s) {
+      if (s.skill !== last) { last = s.skill; rows += '<tr class="grp"><th colspan="5">' + esc(MM.SKILLS.filter(function (k) { return k.id === s.skill; })[0].name) + '</th></tr>'; }
+      rows += '<tr' + (nxt.indexOf(s.id) >= 0 ? ' class="next"' : '') + '><td>' + (nxt.indexOf(s.id) >= 0 ? '★ ' : '') + esc(s.name) + '</td><td>' +
+        (s.ms == null ? '' : sec(s.ms) + ' <small>(' + sec(s.lo) + '–' + sec(s.hi) + ')</small>') + '</td><td>' + s.n + '</td><td>' + lvName(s.level) +
+        '</td><td><button' + (nxt.indexOf(s.id) >= 0 ? ' class="primary"' : '') + ' data-drill="' + esc(s.id) + '">Allenati</button></td></tr>';
+    });
+    return '<div class="scroll"><table class="skills"><tr><th>Passo</th><th>Tempo</th><th>N</th><th>Livello</th><th></th></tr>' + rows + '</table></div>' +
+      '<p class="muted"><small>★ = prossimo passo: il primo di ogni operazione non ancora ad Avanzato. Livello Avanzato di un passo = ' + MM.LEVELS[2].k + ' × il suo tempo di riferimento.</small></p>';
   }
-  document.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-skill]'); if (!b) return;
-    var s = MM.SKILLS.filter(function (x) { return x.id === b.dataset.skill; })[0];
-    var c = JSON.parse(JSON.stringify(s.cfg)); c.dur = 120; c.name = 'Allenamento: ' + s.name.toLowerCase();
-    setForm(c); show('home'); $('#cfg button[type=submit]').focus();
-  });
+  function nextHtml() {
+    if (!db.qs.length) return '';
+    return MM.nextSteps(MM.stepScores(db.qs)).map(function (s) {
+      return '<div class="gap step"><span><b>' + esc(s.name) + '</b><br><small>' + (s.ms == null ? 'pochi dati: prova questo passo' : sec(s.ms) + ' ora, ' + lvName(s.level) + '; Avanzato = ' + sec(s.base * MM.LEVELS[2].k)) + '</small></span>' +
+        '<button class="primary" data-drill="' + esc(s.id) + '">Allenati</button></div>';
+    }).join('');
+  }
   function renderHome() {
-    var h = gapsHtml(3);
-    $('#gaps-short').innerHTML = h ? '<h2>Da migliorare</h2>' + h : (db.sessions.length ? '' : '<p class="muted">Gioca qualche partita: il sito trova da solo dove sei più lento e ti propone esercizi mirati.</p>');
+    var h = gapsHtml(3), p = nextHtml();
+    $('#gaps-short').innerHTML = (p ? '<h2>Prossimi passi</h2>' + p : '') + (h ? '<h2>Da migliorare</h2>' + h : '') + (db.sessions.length ? '' : '<p class="muted">Gioca qualche partita: il sito trova da solo dove sei più lento e ti propone esercizi mirati.</p>');
   }
   function renderStats() {
-    var sk = MM.skillScores(db.qs, 40);
-    $('#radar').innerHTML = sk.some(function (s) { return s.score != null; }) ? radarSvg(sk) + skillTable(sk) : '<p class="muted">Ancora pochi dati: fai il test delle abilità.</p>';
+    var sk = MM.skillScores(db.qs);
+    $('#radar').innerHTML = sk.some(function (s) { return s.ms != null; }) ? radarSvg(sk) + stepTable(MM.stepScores(db.qs)) : '<p class="muted">Ancora pochi dati: fai il test delle abilità.</p>';
     $('#gaps-full').innerHTML = gapsHtml(20) || '<p class="muted">Nessuna lacuna trovata (o pochi dati: gioca ancora).</p>';
     // every mode on one page, most recent first: summary table, then one chart + game list per mode
     var keys = [], last = {};

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mental Math: calcolo veloce</title>
 <meta name="description" content="Allenamento di calcolo mentale a tempo con statistiche automatiche e esercizi mirati sulle tue lacune.">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 <script>try { var t = localStorage.getItem('mm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
@@ -16,7 +16,7 @@
 
 <main>
 <section id="home">
-  <div class="test-box"><div><b>Test delle abilità</b><br><small>42 domande, 6 per ognuna delle 7 abilità, senza limite di tempo: misura dove sei forte e dove no. Rifallo ogni settimana per vedere i progressi.</small></div><button class="primary" id="start-test">Inizia il test</button></div>
+  <div class="test-box"><div><b>Test delle abilità</b><br><small>42 domande, 2 per ognuno dei 21 passi (dalle tabelline ai riporti grandi), senza limite di tempo: misura dove sei forte e dove no. Rifallo ogni settimana per vedere i progressi.</small></div><button class="primary" id="start-test">Inizia il test</button></div>
   <div id="gaps-short"></div>
   <h2>Modalità</h2>
   <div id="presets" class="row"></div>
@@ -56,7 +56,7 @@
 
 <section id="stats" hidden>
   <h2>Abilità</h2>
-  <p class="muted">Ogni vertice è un'abilità: al centro = lento, sul bordo = veloce come un buon candidato a un colloquio quant (100). Calcolato sulle ultime 40 domande di ogni abilità, da tutte le partite.</p>
+  <p class="muted">Ogni vertice è un'abilità, misurata in secondi per domanda su tutte le partite. Sotto, ogni abilità è divisa in passi, dal più facile al più difficile: allenati sul passo con ★.</p>
   <div id="radar"></div>
   <h2>Riepilogo</h2>
   <div id="summary"></div>
@@ -74,8 +74,8 @@
 </section>
 </main>
 
-<script src="core.js?v=4"></script>
-<script src="app.js?v=9"></script>
+<script src="core.js?v=5"></script>
+<script src="app.js?v=10"></script>
 <script src="notes-widget.js?v=2" data-site="mental-math"></script>
 </body>
 </html>

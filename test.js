@@ -43,17 +43,27 @@ for (const k of ['classica', 'grandi', 'estese']) for (let i = 0; i < 3000; i++)
   big.push({ op: q.op, tags: q.tags, al: q.al, ms: 500 * q.al, slip: false });
 }
 assert.deepStrictEqual(M.analyse(big).map(g => g.tag), []);
-// test questions: every skill's generator produces questions classified as that skill
-const tq = M.testQueue();
-assert.strictEqual(tq.length, M.SKILLS.length * 6);
-for (const s of M.SKILLS) for (let i = 0; i < 500; i++) assert.strictEqual(M.skillOf(M.nextQ(s.cfg)), s.id, s.id);
-// classic questions all get a skill too
-for (let i = 0; i < 500; i++) { const k = M.skillOf(M.nextQ(M.PRESETS.classica)); assert.ok(M.SKILLS.some(s => s.id === k)); }
-// scores: at target -> 100, twice the target -> 50, too few -> null
-const sc = M.skillScores([...Array(10)].map(() => ({ skill: 'add', ms: 1800 })).concat([...Array(10)].map(() => ({ skill: 'tab', ms: 2000 }))));
-assert.strictEqual(sc.find(s => s.id === 'add').score, 100);
-assert.strictEqual(sc.find(s => s.id === 'tab').score, 50);
-assert.strictEqual(sc.find(s => s.id === 'dec').score, null);
+// ladder: every step's drill produces only questions of that step, never the same question twice in a row
+assert.strictEqual(M.testQueue().length, M.STEPS.length * 2);
+for (const s of M.STEPS) { let p = null; for (let i = 0; i < 300; i++) { const q = M.nextQ(M.drill(s.id), null, p); assert.strictEqual(M.stepOf(q), s.id, s.id); assert.ok(!p || q.x + q.op + q.y !== p.x + p.op + p.y); p = q; } }
+// every preset's questions land on a step with a skill
+for (const k of Object.keys(M.PRESETS)) for (let i = 0; i < 300; i++) { const q = M.nextQ(M.PRESETS[k]); assert.ok(M.SKILLS.some(s => s.id === M.skillOf(q)), k + JSON.stringify(q) + M.skillOf(q)); }
+// old saved questions (no step tag) get the step from their operands: 58+67 has 2 carries, 7×86 carries 4, 96÷8 is a table
+assert.ok(M.tagsFor({ op: '+', x: '58', y: '67', tags: ['+', '+c2'] }).includes('+:2'));
+assert.ok(M.tagsFor({ op: '×', x: '7', y: '86', tags: ['×', '×7'] }).includes('×:2'));
+assert.strictEqual(M.stepOf({ op: '÷', x: '96', y: '8' }), '÷:t');
+assert.strictEqual(M.stepOf({ op: '-', x: '15', y: '7' }), '-:f');
+// estimate: same times -> that time with no spread; old questions weigh less; too few -> null
+const now = Date.now(), day = 864e5;
+const e1 = M.estimate([...Array(10)].map(() => ({ ms: 2000, s: now })), now);
+assert.ok(Math.abs(e1.ms - 2000) < 1e-6 && Math.abs(e1.hi - e1.lo) < 1e-6);
+const e2 = M.estimate([...Array(10)].map(() => ({ ms: 4000, s: now - 70 * day })).concat([...Array(10)].map(() => ({ ms: 1000, s: now }))), now);
+assert.ok(e2.ms < 1100, e2.ms);
+assert.strictEqual(M.estimate([{ ms: 1, s: now }], now).ms, null);
+// levels: tables at 1 s = Intermedio (base 1000 × 1.125), at 0.5 s = Pro, at 3 s = below Principiante
+assert.strictEqual(M.levelOf(1000, 1000), 1);
+assert.strictEqual(M.levelOf(500, 1000), 3);
+assert.strictEqual(M.levelOf(3000, 1000), -1);
 // carry tags for 1-digit x 2-digit: 7×86 (7×6=42 -> carry 4), 3×21 (no carry), tables tagged by factor
 const r2 = M.drill('×r2');
 for (let i = 0; i < 200; i++) { const q = M.nextQ(r2); assert.ok(Math.floor(Number(q.x) * (Number(q.y) % 10) / 10) >= 4, q.x + 'x' + q.y); }
