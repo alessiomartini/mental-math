@@ -55,3 +55,18 @@ details summary { cursor: pointer; color: var(--muted); }
 
 .scroll { overflow-x: auto; }
 @media (max-width: 520px) { .skills { font-size: .85rem; } .skills th, .skills td { padding: .25rem .3rem; } }
+
+/* skill levels: one warm hue, light -> dark = Principiante -> Pro (dark theme: dim -> bright) */
+:root { --lv0: #f0b9a3; --lv1: #e0805c; --lv2: #c24a2a; --lv3: #7f2210; }
+:root[data-theme="dark"] { --lv0: #6b2c1c; --lv1: #a8452a; --lv2: #dd6a45; --lv3: #f7b096; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --lv0: #6b2c1c; --lv1: #a8452a; --lv2: #dd6a45; --lv3: #f7b096; } }
+.radar .lv { fill: none; stroke-width: 1.5; stroke-dasharray: 5 3; }
+.lv0 { stroke: var(--lv0); background: var(--lv0); } .lv1 { stroke: var(--lv1); background: var(--lv1); }
+.lv2 { stroke: var(--lv2); background: var(--lv2); } .lv3 { stroke: var(--lv3); background: var(--lv3); }
+.radar .err { stroke: var(--fg); stroke-width: 2; stroke-linecap: round; }
+.legend { display: flex; flex-wrap: wrap; gap: .3rem 1rem; justify-content: center; font-size: .9rem; }
+.legend .sw { display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: .35rem; vertical-align: middle; }
+.legend .sw.you { height: 10px; background: var(--accent); opacity: .6; }
+table.skills tr.grp th { padding-top: .7rem; color: var(--fg); font-weight: 600; }
+table.skills tr.next td { font-weight: 600; }
+.gap.step { border-left-color: var(--accent); }

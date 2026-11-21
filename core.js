@@ -59,6 +59,7 @@
     if (q.op === '-') t.push('-b' + Math.min(q.c, 3));
     if (q.op === '×' || q.op === '÷') t = t.concat(d ? [q.op + (q.f <= 20 ? q.f : '21+')] : mdTags(q.op, q.f, Number(q.op === '×' ? q.y : q.ans)));
     if (d) t.push(q.op + 'dec');
+    t.push(stepOf(q));
     return t;
   }
   // × and ÷ (f = small factor, m = other factor / quotient). Tables (m <= 12) are tagged by factor;
@@ -72,16 +73,74 @@
   }
   // Tags recomputed from the operands, so old logged questions follow the current tagging.
   function tagsFor(q) {
-    if ((q.op !== '×' && q.op !== '÷') || q.x === undefined || /\./.test(q.x + q.y)) return q.tags;
-    var x = Number(q.x), y = Number(q.y), f = q.op === '×' ? x : y, m = q.op === '×' ? y : x / y;
-    return [q.op].concat(mdTags(q.op, f, m));
+    if (q.x === undefined) return q.tags;
+    var t = (q.tags || [q.op]).filter(function (x) { return x.indexOf(':') < 0; });
+    if ((q.op === '×' || q.op === '÷') && !/\./.test(q.x + q.y)) {
+      var x = Number(q.x), y = Number(q.y), f = q.op === '×' ? x : y, m = q.op === '×' ? y : x / y;
+      t = [q.op].concat(mdTags(q.op, f, m));
+    }
+    return t.concat(stepOf(q));
   }
 
-  // Draws until the question carries cfg.focus (if set). ponytail: rejection sampling, fine for these ranges.
-  function nextQ(cfg, r) {
-    for (var i = 0; i < 200; i++) {
+  // ---------- the ladder: small steps from what is automatic to what is slow (Alessio's site note, 2026-11-21) ----------
+  // Each step fixes the number of digits and the carries, so one step is one kind of difficulty.
+  // × and ÷ beyond the tables go by carry size (0, 1-3, 4-8), not by number of carries: in the 2026-11-20 data
+  // the size of the carry from units into tens explained the time (3.4 s -> 6-8.5 s).
+  // base = time (ms) of someone scoring about 45 in Classica: add/sub/mul from Alessio's sheet, the rest estimated.
+  function ccfg(o) { return Object.assign({ dur: 120, dec: 0, add: { on: false, a: [2, 100], b: [2, 100] }, sub: false, mul: { on: false, a: [2, 12], b: [2, 100] }, div: false }, o); }
+  var A1 = { on: true, a: [2, 9], b: [2, 9] }, A2 = { on: true, a: [10, 99], b: [10, 99] }, A3 = { on: true, a: [100, 999], b: [100, 999] };
+  var ADD1 = { on: false, a: [2, 9], b: [2, 9] }, ADD2 = { on: false, a: [10, 99], b: [10, 99] }, ADD3 = { on: false, a: [100, 999], b: [100, 999] };
+  var T = { on: true, a: [2, 12], b: [2, 12] }, M2 = { on: true, a: [2, 12], b: [13, 99] }, M3 = { on: true, a: [2, 9], b: [100, 999] };
+  var off = function (m) { return Object.assign({}, m, { on: false }); };
+  var CARRY = ['senza riporto', 'riporto piccolo (1–3)', 'riporto grande (4–8)'];
+  var STEPS = [
+    { id: '×:t', skill: 'tab', name: '× tabelline', base: 1000, cfg: ccfg({ mul: T }) },
+    { id: '÷:t', skill: 'tab', name: '÷ tabelline', base: 1100, cfg: ccfg({ mul: off(T), div: true }) },
+    { id: '×:0', skill: 'mul', name: '× 1×2 cifre ' + CARRY[0], base: 2000, cfg: ccfg({ mul: M2 }) },
+    { id: '×:1', skill: 'mul', name: '× 1×2 cifre ' + CARRY[1], base: 2800, cfg: ccfg({ mul: M2 }) },
+    { id: '×:2', skill: 'mul', name: '× 1×2 cifre ' + CARRY[2], base: 3500, cfg: ccfg({ mul: M2 }) },
+    { id: '÷:0', skill: 'div', name: '÷ quoziente a 2 cifre ' + CARRY[0], base: 2000, cfg: ccfg({ mul: off(M2), div: true }) },
+    { id: '÷:1', skill: 'div', name: '÷ quoziente a 2 cifre ' + CARRY[1], base: 2800, cfg: ccfg({ mul: off(M2), div: true }) },
+    { id: '÷:2', skill: 'div', name: '÷ quoziente a 2 cifre ' + CARRY[2], base: 3500, cfg: ccfg({ mul: off(M2), div: true }) },
+    { id: '+:f', skill: 'add', name: '+ fra numeri a 1 cifra', base: 800, cfg: ccfg({ add: A1 }) },
+    { id: '+:0', skill: 'add', name: '+ 2 cifre senza riporto', base: 1300, cfg: ccfg({ add: A2 }) },
+    { id: '+:1', skill: 'add', name: '+ 2 cifre con 1 riporto', base: 1800, cfg: ccfg({ add: A2 }) },
+    { id: '+:2', skill: 'add', name: '+ 2 cifre con 2 riporti', base: 2300, cfg: ccfg({ add: A2 }) },
+    { id: '-:f', skill: 'sub', name: '− fatti (risultato a 1 cifra)', base: 900, cfg: ccfg({ add: ADD1, sub: true }) },
+    { id: '-:0', skill: 'sub', name: '− 2 cifre senza prestito', base: 1400, cfg: ccfg({ add: ADD2, sub: true }) },
+    { id: '-:1', skill: 'sub', name: '− 2 cifre con 1 prestito', base: 2000, cfg: ccfg({ add: ADD2, sub: true }) },
+    { id: '-:2', skill: 'sub', name: '− 2 cifre con 2 prestiti', base: 2500, cfg: ccfg({ add: ADD2, sub: true }) },
+    { id: '+:g', skill: 'big', name: '+ 3 cifre', base: 3500, cfg: ccfg({ add: A3 }) },
+    { id: '-:g', skill: 'big', name: '− 3 cifre', base: 4000, cfg: ccfg({ add: ADD3, sub: true }) },
+    { id: '×:g', skill: 'big', name: '× numeri grandi (1×3 cifre)', base: 4500, cfg: ccfg({ mul: M3 }) },
+    { id: '÷:g', skill: 'big', name: '÷ numeri grandi (quoziente a 3 cifre)', base: 4500, cfg: ccfg({ mul: off(M3), div: true }) },
+    { id: 'd:d', skill: 'dec', name: 'decimali (+ − × ÷)', base: 3000, cfg: ccfg({ dec: 1, add: { on: true, a: [2, 100], b: [2, 100] }, sub: true, mul: { on: true, a: [2, 12], b: [2, 100] }, div: true }) }
+  ];
+  STEPS.forEach(function (s) { s.cfg.focus = s.id; s.cfg.name = 'Allenamento: ' + s.name; });
+  var STEP = {}; STEPS.forEach(function (s) { STEP[s.id] = s; });
+  // The step of any logged question, recomputed from its operands (also for questions saved before the ladder existed).
+  function stepOf(q) {
+    if (/\./.test(q.x + q.y)) return 'd:d';
+    var x = Number(q.x), y = Number(q.y);
+    if (q.op === '+' || q.op === '-') {
+      var a = q.op === '+' ? x : y, b = q.op === '+' ? y : x - y; // '-' is a reversed '+': a + b = x
+      if (Math.max(a, b) >= 100) return q.op + ':g';
+      if (a <= 9 && b <= 9) return q.op + ':f';
+      return q.op + ':' + Math.min(carries(a, b), 2);
+    }
+    var f = q.op === '×' ? Math.min(x, y) : y, m = q.op === '×' ? Math.max(x, y) : x / y;
+    if (f > 12 || m > 100) return q.op + ':g'; // 100 = round, no carry
+    if (m <= 12) return q.op + ':t';
+    var c = Math.floor(f * (m % 10) / 10);
+    return q.op + ':' + (c === 0 ? 0 : c < 4 ? 1 : 2);
+  }
+
+  // Draws until the question carries cfg.focus (if set) and is not the same as prev.
+  // ponytail: rejection sampling, fine for these ranges.
+  function nextQ(cfg, r, prev) {
+    for (var i = 0; i < 300; i++) {
       var q = makeQ(cfg, r);
-      if (!cfg.focus || q.tags.indexOf(cfg.focus) >= 0) return q;
+      if ((!cfg.focus || q.tags.indexOf(cfg.focus) >= 0) && !(prev && q.op === prev.op && q.x === prev.x && q.y === prev.y)) return q;
     }
     return makeQ(cfg, r);
   }
@@ -108,7 +167,7 @@
     var out = [];
     Object.keys(byTag).forEach(function (t) {
       var op = t.charAt(0), list = byTag[t], base = byTag[op];
-      if (t === op || list.length < MIN || !base) return;
+      if (t === op || t.indexOf(':') >= 0 || list.length < MIN || !base) return; // ladder steps have their own table
       var mt = median(list.map(function (q) { return q.ms; })), mo = median(base.map(function (q) { return q.ms; }));
       var slip = list.filter(function (q) { return q.slip; }).length / list.length;
       var slipO = base.filter(function (q) { return q.slip; }).length / base.length;
@@ -122,6 +181,7 @@
 
   var OPNAME = { '+': 'addizioni', '-': 'sottrazioni', '×': 'moltiplicazioni', '÷': 'divisioni' };
   function label(t) {
+    if (STEP[t]) return STEP[t].name;
     var op = t.charAt(0), rest = t.slice(1);
     if (rest === 'dec') return OPNAME[op] + ' con la virgola';
     if (/^r\d$/.test(rest)) return (op === '×' ? 'moltiplicazioni 1×2 cifre ' : 'divisioni con quoziente a 2 cifre ') +
@@ -133,6 +193,7 @@
 
   // Training config for a gap tag.
   function drill(t) {
+    if (STEP[t]) return JSON.parse(JSON.stringify(STEP[t].cfg));
     var op = t.charAt(0), rest = t.slice(1);
     var c = { name: 'Allenamento: ' + label(t), dur: 120, dec: 0, add: { on: false, a: [2, 100], b: [2, 100] }, sub: false, mul: { on: false, a: [2, 12], b: [2, 100] }, div: false };
     if (op === '+' || op === '-') {
@@ -145,7 +206,8 @@
       if (rest === 'dec') { c.dec = 1; }
       else if (/^r\d$/.test(rest)) { c.mul.a = [2, 12]; c.mul.b = [13, 99]; c.focus = t; }
       else if (rest === '21+') { c.mul.a = [21, 99]; c.mul.b = [2, 12]; }
-      else { c.mul.a = [Number(rest), Number(rest)]; c.mul.b = [2, 100]; c.mul.on = true; c.div = true; c.name = 'Allenamento: tabellina del ' + rest + ' (× e ÷)'; }
+      // tables only (b <= 12): the ×N gap tag counts only m <= 12, and with b up to 100 nine questions in ten were 1×2 digits
+      else { c.mul.a = [Number(rest), Number(rest)]; c.mul.b = [2, 12]; c.mul.on = true; c.div = true; c.name = 'Allenamento: tabellina del ' + rest + ' (× e ÷)'; }
     }
     return c;
   }
@@ -157,50 +219,83 @@
     return JSON.stringify([c.dur, c.dec || 0, c.add.on, c.sub, as && c.add.a, as && c.add.b, c.mul.on, c.div, md && c.mul.a, md && c.mul.b, c.focus || '']);
   }
 
-  // ---------- skills (radar axes) and the diagnostic test ----------
-  // target = median time (ms) of a fast quant-interview candidate. add/sub/mul/div from the targets in
-  // Alessio's Zetamac sheet (to reach 45+ in Classica); tab/big/dec are estimates, to tune with real data.
-  function cfgOf(o) { return Object.assign({ dur: 0, dec: 0, add: { on: false, a: [2, 100], b: [2, 100] }, sub: false, mul: { on: false, a: [2, 12], b: [2, 100] }, div: false }, o); }
+  // ---------- skills (radar axes), levels and the diagnostic test ----------
+  // A skill groups ladder steps. base = time (ms) of someone scoring about 45 in Classica (see STEPS).
   var SKILLS = [
-    { id: 'add', name: 'Addizioni', target: 1800, cfg: cfgOf({ add: { on: true, a: [2, 100], b: [2, 100] } }) },
-    { id: 'sub', name: 'Sottrazioni', target: 2000, cfg: cfgOf({ sub: true }) },
-    { id: 'tab', name: 'Tabelline', target: 1000, cfg: cfgOf({ mul: { on: true, a: [2, 12], b: [2, 12] } }) },
-    { id: 'mul', name: 'Molt. 1×2 cifre', target: 2800, cfg: cfgOf({ mul: { on: true, a: [2, 12], b: [13, 100] } }) },
-    { id: 'div', name: 'Divisioni', target: 2400, cfg: cfgOf({ div: true }) },
-    { id: 'big', name: 'Numeri grandi', target: 3500, cfg: cfgOf({ add: { on: true, a: [101, 999], b: [10, 999] }, sub: true }) },
-    { id: 'dec', name: 'Decimali', target: 3000, cfg: cfgOf({ dec: 1, add: { on: true, a: [2, 100], b: [2, 100] }, sub: true, mul: { on: true, a: [2, 12], b: [2, 100] }, div: true }) }
+    { id: 'add', name: 'Addizioni', base: 1800 },
+    { id: 'sub', name: 'Sottrazioni', base: 2000 },
+    { id: 'tab', name: 'Tabelline × ÷', base: 1050 },
+    { id: 'mul', name: 'Molt. 1×2 cifre', base: 2800 },
+    { id: 'div', name: 'Div. quoziente 2 cifre', base: 2800 },
+    { id: 'big', name: 'Numeri grandi', base: 4000 },
+    { id: 'dec', name: 'Decimali', base: 3000 }
   ];
-  // Classifies any logged question (also from normal games) into one skill.
-  function skillOf(q) {
-    var x = Number(q.x), y = Number(q.y);
-    if (q.tags && q.tags.some(function (t) { return /dec$/.test(t); })) return 'dec';
-    if (q.op === '+') return Math.max(x, y) > 100 ? 'big' : 'add';
-    if (q.op === '-') return y > 100 || x - y > 100 ? 'big' : 'sub';
-    if (q.op === '×') { var f = Math.min(x, y), m = Math.max(x, y); return f > 12 ? 'big' : m <= 12 ? 'tab' : 'mul'; }
-    return y > 12 ? 'big' : 'div';
+  // Reference levels: time = base × k. k = 45 / (Classica score of the level), so they mirror the Classica
+  // scores 25 / 40 / 55 / 75. Estimates: there are no published norms for these times.
+  var LEVELS = [
+    { id: 'pri', name: 'Principiante', classica: 25, k: 1.8 },
+    { id: 'int', name: 'Intermedio', classica: 40, k: 1.125 },
+    { id: 'ava', name: 'Avanzato', classica: 55, k: 0.82 },
+    { id: 'pro', name: 'Pro', classica: 75, k: 0.6 }
+  ];
+  function skillOf(q) { return STEP[stepOf(q)].skill; }
+
+  // Estimate of the typical time: exponentially time-weighted mean of log(ms) (half-life HALF days, so
+  // old games fade out instead of being dropped), with ± one standard error from the effective sample size.
+  // Skips count as at least SKIP ms; every time is capped at CAP so one distracted question cannot dominate.
+  var HALF = 7, SKIP = 10000, CAP = 20000, DAY = 864e5;
+  function estimate(list, now) {
+    var sw = 0, sw2 = 0, sv = 0, svv = 0;
+    list.forEach(function (q) {
+      var w = Math.pow(0.5, Math.max(0, now - (q.s || now)) / DAY / HALF);
+      var v = Math.log(Math.min(CAP, q.skip ? Math.max(q.ms, SKIP) : q.ms));
+      sw += w; sw2 += w * w; sv += w * v; svv += w * v * v;
+    });
+    if (list.length < 5) return { n: list.length, ms: null };
+    var m = sv / sw, se = Math.sqrt(Math.max(0, svv / sw - m * m) / (sw * sw / sw2));
+    return { n: list.length, ms: Math.exp(m), lo: Math.exp(m - se), hi: Math.exp(m + se) };
   }
-  var PER_SKILL = 6;
-  // Test: PER_SKILL questions per skill, shuffled, no time limit.
+  // Highest level reached (index in LEVELS), -1 = below Principiante, null = no estimate.
+  function levelOf(ms, base) {
+    if (ms == null) return null;
+    for (var i = LEVELS.length - 1; i >= 0; i--) if (ms <= base * LEVELS[i].k) return i;
+    return -1;
+  }
+  function scores(groups, key, qs, now) {
+    var by = {};
+    qs.forEach(function (q) { var k = key(q); (by[k] = by[k] || []).push(q); });
+    return groups.map(function (g) {
+      var e = estimate(by[g.id] || [], now || Date.now());
+      return Object.assign({ id: g.id, name: g.name, base: g.base, skill: g.skill, level: levelOf(e.ms, g.base) }, e);
+    });
+  }
+  function skillScores(qs, now) { return scores(SKILLS, skillOf, qs, now); }
+  function stepScores(qs, now) { return scores(STEPS, stepOf, qs, now); }
+  // Next step of each operation's ladder: the first one not yet at Avanzato (or with too few questions).
+  var GOAL = 2;
+  function nextSteps(st) {
+    var out = [];
+    ['×', '÷', '+', '-'].forEach(function (op) {
+      var s = st.filter(function (x) { return x.id.charAt(0) === op && (x.level == null || x.level < GOAL); })[0];
+      if (s) out.push(s);
+    });
+    return out;
+  }
+  var PER_STEP = 2;
+  // Test: PER_STEP questions per ladder step, shuffled, no time limit.
   function testQueue(r) {
     var q = [];
-    SKILLS.forEach(function (s) { for (var i = 0; i < PER_SKILL; i++) { var x = nextQ(s.cfg, r); x.skill = s.id; q.push(x); } });
+    STEPS.forEach(function (s) { var p = null; for (var i = 0; i < PER_STEP; i++) q.push(p = nextQ(s.cfg, r, p)); });
     for (var i = q.length - 1; i > 0; i--) { var j = rnd(0, i, r), t = q[i]; q[i] = q[j]; q[j] = t; }
     return q;
   }
-  // Skill score 0-100 = target / median time over the last `last` questions of that skill (capped at 100).
-  // Skipped questions count with their (long) time. null = fewer than 5 questions.
-  function skillScores(qs, last) {
-    var by = {};
-    qs.forEach(function (q) { var s = q.skill || skillOf(q); (by[s] = by[s] || []).push(q); });
-    return SKILLS.map(function (s) {
-      var l = (by[s.id] || []).slice(-(last || 40));
-      if (l.length < 5) return { id: s.id, name: s.name, n: l.length, score: null };
-      var med = median(l.map(function (q) { return q.ms; }));
-      return { id: s.id, name: s.name, n: l.length, ms: med, slip: l.filter(function (q) { return q.slip; }).length / l.length,
-        score: Math.min(100, Math.round(100 * s.target / med)) };
-    });
+  // One number for a test: 100 × geometric mean of base / time over the questions, i.e. 100 ≈ the level of 45 in Classica.
+  function testIndex(qs) {
+    if (!qs.length) return 0;
+    var s = qs.reduce(function (a, q) { return a + Math.log(STEP[stepOf(q)].base / Math.min(CAP, q.skip ? Math.max(q.ms, SKIP) : q.ms)); }, 0);
+    return Math.round(100 * Math.exp(s / qs.length));
   }
 
-  var api = { PRESETS: PRESETS, SKILLS: SKILLS, skillOf: skillOf, testQueue: testQueue, skillScores: skillScores, OPNAME: OPNAME, fmt: fmt, carries: carries, makeQ: makeQ, nextQ: nextQ, isRight: isRight, isPrefix: isPrefix, analyse: analyse, label: label, drill: drill, modeKey: modeKey, median: median };
+  var api = { PRESETS: PRESETS, SKILLS: SKILLS, STEPS: STEPS, LEVELS: LEVELS, skillOf: skillOf, stepOf: stepOf, testQueue: testQueue, testIndex: testIndex, skillScores: skillScores, stepScores: stepScores, nextSteps: nextSteps, estimate: estimate, levelOf: levelOf, OPNAME: OPNAME, fmt: fmt, carries: carries, makeQ: makeQ, nextQ: nextQ, isRight: isRight, isPrefix: isPrefix, analyse: analyse, label: label, drill: drill, modeKey: modeKey, median: median, tagsFor: tagsFor };
   if (typeof module !== 'undefined') module.exports = api; else root.MM = api;
 })(this);
