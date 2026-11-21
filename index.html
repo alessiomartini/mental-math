@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mental Math: calcolo veloce</title>
 <meta name="description" content="Allenamento di calcolo mentale a tempo con statistiche automatiche e esercizi mirati sulle tue lacune.">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 <script>try { var t = localStorage.getItem('mm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
@@ -58,24 +58,28 @@
   <h2>Abilità</h2>
   <p class="muted">Ogni vertice è un'abilità, misurata in secondi per domanda su tutte le partite. Sotto, ogni abilità è divisa in passi, dal più facile al più difficile: allenati sul passo con ★.</p>
   <div id="radar"></div>
-  <h2>Riepilogo</h2>
-  <div id="summary"></div>
+  <h2>Progressi per passo</h2>
+  <p class="muted">Ogni punto è una domanda, nell'ordine in cui le hai fatte; la linea è la mediana delle ultime 25. Asse dei tempi logaritmico e uguale per tutti i grafici. Le linee tratteggiate sono i livelli di quel passo.</p>
+  <div id="steps"></div>
+  <h2>Tabelline: tempo per fatto</h2>
+  <p class="muted">Una casella per fatto (7 × 8 e 8 × 7 insieme; per ÷, divisore e quoziente). Più scura = più lenta. Passa sopra una casella per il dettaglio.</p>
+  <div id="facts"></div>
   <h2>Lacune</h2>
   <p class="muted">Confronta il tuo tempo mediano su ogni tipo di domanda con quello della sua operazione (×7 contro tutte le ×, addizioni con 2 riporti contro tutte le addizioni). Servono almeno 10 domande di un tipo.</p>
   <div id="gaps-full"></div>
-  <h2>Per operazione</h2>
-  <div id="ops"></div>
-  <h2>Andamento per modalità</h2>
-  <p class="muted">Linea: media del giorno. Punti: singole partite. Ogni grafico ha la sua scala.</p>
-  <div id="modes"></div>
+  <h2>Modalità</h2>
+  <div id="summary"></div>
+  <h2>Classica: punti a partita</h2>
+  <p class="muted">Linea: media del giorno. Punti: singole partite (anche quelle importate).</p>
+  <div id="classic"></div>
   <h2>Dati</h2>
   <p class="muted">Tutto resta in questo browser (niente account). Esporta un file per tenerne una copia o spostarlo su un altro dispositivo.</p>
   <div class="row"><button id="export">Esporta</button><label class="btn">Importa<input type="file" id="import" accept="application/json" hidden></label><button id="wipe">Cancella tutto</button></div>
 </section>
 </main>
 
-<script src="core.js?v=5"></script>
-<script src="app.js?v=10"></script>
+<script src="core.js?v=6"></script>
+<script src="app.js?v=11"></script>
 <script src="notes-widget.js?v=2" data-site="mental-math"></script>
 </body>
 </html>

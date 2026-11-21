@@ -198,12 +198,12 @@
     var nxt = MM.nextSteps(st).map(function (s) { return s.id; });
     var rows = '', last = null;
     st.forEach(function (s) {
-      if (s.skill !== last) { last = s.skill; rows += '<tr class="grp"><th colspan="5">' + esc(MM.SKILLS.filter(function (k) { return k.id === s.skill; })[0].name) + '</th></tr>'; }
+      if (s.skill !== last) { last = s.skill; rows += '<tr class="grp"><th colspan="6">' + esc(MM.SKILLS.filter(function (k) { return k.id === s.skill; })[0].name) + '</th></tr>'; }
       rows += '<tr' + (nxt.indexOf(s.id) >= 0 ? ' class="next"' : '') + '><td>' + (nxt.indexOf(s.id) >= 0 ? '★ ' : '') + esc(s.name) + '</td><td>' +
-        (s.ms == null ? '' : sec(s.ms) + ' <small>(' + sec(s.lo) + '–' + sec(s.hi) + ')</small>') + '</td><td>' + s.n + '</td><td>' + lvName(s.level) +
+        (s.ms == null ? '' : sec(s.ms) + ' <small>(' + sec(s.lo) + '–' + sec(s.hi) + ')</small>') + '</td><td>' + s.n + '</td><td>' + (s.n ? Math.round(100 * s.slip) + '%' : '') + '</td><td>' + lvName(s.level) +
         '</td><td><button' + (nxt.indexOf(s.id) >= 0 ? ' class="primary"' : '') + ' data-drill="' + esc(s.id) + '">Allenati</button></td></tr>';
     });
-    return '<div class="scroll"><table class="skills"><tr><th>Passo</th><th>Tempo</th><th>N</th><th>Livello</th><th></th></tr>' + rows + '</table></div>' +
+    return '<div class="scroll"><table class="skills"><tr><th>Passo</th><th>Tempo</th><th>N</th><th title="Domande con almeno un errore di battitura">Errori</th><th>Livello</th><th></th></tr>' + rows + '</table></div>' +
       '<p class="muted"><small>★ = prossimo passo: il primo di ogni operazione non ancora ad Avanzato. Livello Avanzato di un passo = ' + MM.LEVELS[2].k + ' × il suo tempo di riferimento.</small></p>';
   }
   function nextHtml() {
@@ -217,11 +217,15 @@
     var h = gapsHtml(3), p = nextHtml();
     $('#gaps-short').innerHTML = (p ? '<h2>Prossimi passi</h2>' + p : '') + (h ? '<h2>Da migliorare</h2>' + h : '') + (db.sessions.length ? '' : '<p class="muted">Gioca qualche partita: il sito trova da solo dove sei più lento e ti propone esercizi mirati.</p>');
   }
+  // Stats are built on questions, not games: every answered question is one data point, grouped by what it is
+  // (its ladder step, or its table fact), never by the mode it came from (a mode mixes several kinds of question).
   function renderStats() {
-    var sk = MM.skillScores(db.qs);
-    $('#radar').innerHTML = sk.some(function (s) { return s.ms != null; }) ? radarSvg(sk) + stepTable(MM.stepScores(db.qs)) : '<p class="muted">Ancora pochi dati: fai il test delle abilità.</p>';
+    var sk = MM.skillScores(db.qs), st = MM.stepScores(db.qs);
+    $('#radar').innerHTML = sk.some(function (s) { return s.ms != null; }) ? radarSvg(sk) + stepTable(st) : '<p class="muted">Ancora pochi dati: fai il test delle abilità.</p>';
+    $('#steps').innerHTML = stepCharts(st);
+    $('#facts').innerHTML = factsHtml();
     $('#gaps-full').innerHTML = gapsHtml(20) || '<p class="muted">Nessuna lacuna trovata (o pochi dati: gioca ancora).</p>';
-    // every mode on one page, most recent first: summary table, then one chart + game list per mode
+    // summary of every mode (also imported games, which have scores only): the launcher for "Gioca"
     var keys = [], last = {};
     db.sessions.slice().reverse().forEach(function (s) { if (keys.indexOf(s.key) < 0) { keys.push(s.key); last[s.key] = s; } });
     var count = function (k) { return db.sessions.filter(function (s) { return s.key === k; }).length; };
@@ -230,59 +234,99 @@
     var mean = function (a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; };
     var rows = keys.map(function (k, i) {
       var sc = db.sessions.filter(function (s) { return s.key === k; }).map(function (s) { return s.score; });
-      return '<tr><td><a href="#m' + i + '">' + esc(last[k].name) + '</a></td><td>' + sc.length + '</td><td>' + sc[sc.length - 1] + '</td><td>' +
+      return '<tr><td>' + esc(last[k].name) + '</td><td>' + sc.length + '</td><td>' + sc[sc.length - 1] + '</td><td>' +
         mean(sc.slice(-10)).toFixed(1) + '</td><td>' + Math.max.apply(null, sc) + '</td><td><button data-play="' + i + '">Gioca</button></td></tr>';
     }).join('');
-    $('#summary').innerHTML = rows ? '<table><tr><th>Modalità</th><th>Partite</th><th>Ultima</th><th title="Media delle ultime 10 partite">Media 10</th><th>Record</th><th></th></tr>' + rows + '</table>' : '<p class="muted">Ancora nessuna partita.</p>';
-    $('#modes').innerHTML = keys.map(function (k, i) { return modeHtml(k, i, last[k].name); }).join('');
-    // per operation
-    var ops = ['+', '-', '×', '÷'].map(function (op) {
-      var l = db.qs.filter(function (q) { return q.op === op; }).slice(-1000);
-      if (!l.length) return '';
-      return '<tr><td>' + op + '</td><td>' + l.length + '</td><td>' + (MM.median(l.map(function (q) { return q.ms; })) / 1000).toFixed(2) + ' s</td><td>' +
-        Math.round(100 * l.filter(function (q) { return q.slip; }).length / l.length) + '%</td></tr>';
-    }).join('');
-    $('#ops').innerHTML = ops ? '<table><tr><th>Op.</th><th>Domande (ultime 1000)</th><th>Tempo mediano</th><th>Con errori</th></tr>' + ops + '</table>' : '<p class="muted">Ancora nessun dato.</p>';
+    $('#summary').innerHTML = rows ? '<div class="scroll"><table><tr><th>Modalità</th><th>Partite</th><th>Ultima</th><th title="Media delle ultime 10 partite">Media 10</th><th>Record</th><th></th></tr>' + rows + '</table></div>' : '<p class="muted">Ancora nessuna partita.</p>';
+    $('#classic').innerHTML = classicHtml();
   }
   var playCfgs = [];
   document.addEventListener('click', function (e) { var b = e.target.closest('[data-play]'); if (b) start(playCfgs[b.dataset.play]); });
-  // series of {t, v, lab?} in order, one dot each. unit 'partita': line = mean of each day.
-  // unit 'domanda': line = median of the last 25 questions, y axis capped at the 95th percentile (slower ones sit on the top line).
-  function chartSvg(ss, title, fmtV, unit) {
-    var W = 640, H = ss.length > 10 ? 180 : 120, L = 40, B = 22, T = 14, vs = ss.map(function (s) { return s.v; });
-    var max = (unit === 'domanda' ? vs.slice().sort(function (a, b) { return a - b; })[Math.floor(0.95 * (vs.length - 1))] : Math.max.apply(null, vs)) || 1;
-    var x = function (i) { return L + (ss.length === 1 ? (W - L - 10) / 2 : i * (W - L - 10) / (ss.length - 1)); };
-    var y = function (v) { return T + (H - T - B) * (1 - Math.min(v, max) / max); };
-    var line;
-    if (unit === 'domanda') line = ss.length < 25 ? [] : ss.map(function (s, i) { return [x(i), y(MM.median(vs.slice(Math.max(0, i - 24), i + 1)))]; }).slice(24);
-    else {
-      var days = [], cur = null;
-      ss.forEach(function (s, i) { var d = s.t.slice(0, 10); if (!cur || cur.d !== d) days.push(cur = { d: d, i: [], sum: 0 }); cur.i.push(i); cur.sum += s.v; });
-      line = days.map(function (d) { return [x((d.i[0] + d.i[d.i.length - 1]) / 2), y(d.sum / d.i.length)]; });
-    }
-    return '<p class="muted">' + title + '</p><svg' + (line.length > 1 ? '' : ' class="solo"') + ' viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + title + '">' +
-      '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>' +
-      '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(max) + '" y2="' + y(max) + '"/>' +
-      '<text x="' + (L - 6) + '" y="' + (y(0) + 4) + '" text-anchor="end">0</text><text x="' + (L - 6) + '" y="' + (y(max) + 4) + '" text-anchor="end">' + fmtV(max) + '</text>' +
-      '<text x="' + L + '" y="' + (H - 4) + '">' + unit + ' 1</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" text-anchor="end">' + unit + ' ' + ss.length + '</text>' +
-      ss.map(function (s, i) { return '<circle class="game" cx="' + x(i).toFixed(1) + '" cy="' + y(s.v).toFixed(1) + '" r="' + (unit === 'domanda' ? 2 : 3) + '"><title>' + s.t.slice(0, 10) + ': ' + (s.lab ? esc(s.lab) + ', ' : '') + fmtV(s.v) + '</title></circle>'; }).join('') +
-      (line.length > 1 ? '<path d="M' + line.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join('L') + '"/>' : '') +
-      '</svg>';
+  var dd = function (t) { return new Date(t).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }); };
+
+  // Small multiples, one per ladder step: a dot per question, the median of the last 25 as the line, the step's
+  // 4 level times as dashed lines. Same log time axis on every panel (0.5-20 s), so panels compare.
+  var YMIN = 500, YMAX = 20000;
+  function stepCharts(st) {
+    var by = {};
+    db.qs.forEach(function (q) { if (q.ms) { var k = MM.stepOf(q); (by[k] = by[k] || []).push(q); } });
+    var panels = st.filter(function (s) { return (by[s.id] || []).length >= 5; }).map(function (s) {
+      var l = by[s.id], n = l.length, W = 320, H = 150, L = 34, R = 8, T = 8, B = 18;
+      var x = function (i) { return L + (n === 1 ? 0 : i * (W - L - R) / (n - 1)); };
+      var y = function (ms) { return T + (H - T - B) * (1 - Math.log(Math.min(YMAX, Math.max(YMIN, ms)) / YMIN) / Math.log(YMAX / YMIN)); };
+      var hl = function (ms, cls, tip) { return '<line class="' + cls + '" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(ms).toFixed(1) + '" y2="' + y(ms).toFixed(1) + '">' + (tip ? '<title>' + tip + '</title>' : '') + '</line>'; };
+      var g = [1000, 2000, 5000, 10000].map(function (ms) { return hl(ms, 'grid') + '<text x="' + (L - 4) + '" y="' + (y(ms) + 3).toFixed(1) + '" text-anchor="end">' + ms / 1000 + ' s</text>'; }).join('');
+      // day boundaries (faint) with a date label when there is room
+      var days = '', lastX = -99;
+      l.forEach(function (q, i) {
+        if (i && dd(q.s) === dd(l[i - 1].s)) return;
+        var xx = x(i);
+        if (i) days += '<line class="day" x1="' + xx.toFixed(1) + '" x2="' + xx.toFixed(1) + '" y1="' + T + '" y2="' + (H - B) + '"/>';
+        if (xx - lastX > 40 && xx < W - R - 20) { days += '<text x="' + xx.toFixed(1) + '" y="' + (H - 5) + '">' + dd(q.s) + '</text>'; lastX = xx; }
+      });
+      var lv = MM.LEVELS.map(function (Lv, j) { return hl(s.base * Lv.k, 'lv lv' + j, Lv.name + ': ' + sec(s.base * Lv.k)); }).join('');
+      var dots = l.map(function (q, i) {
+        return '<circle' + (q.skip ? ' class="skip"' : '') + ' cx="' + x(i).toFixed(1) + '" cy="' + y(q.ms).toFixed(1) + '" r="2.2"><title>' + dd(q.s) + ': ' + esc(q.x + ' ' + (q.op === '-' ? '−' : q.op) + ' ' + q.y) + ', ' + sec(q.ms) + (q.skip ? ' (saltata)' : q.slip ? ' (con errore)' : '') + '</title></circle>';
+      }).join('');
+      var w = Math.min(25, n), line = n < 10 ? '' : '<path d="M' + l.slice(w - 1).map(function (q, k) {
+        var i = k + w - 1; return x(i).toFixed(1) + ',' + y(MM.median(l.slice(i - w + 1, i + 1).map(function (z) { return z.ms; }))).toFixed(1);
+      }).join('L') + '"/>';
+      return '<div class="panel"><h3>' + esc(s.name) + '</h3><small class="muted">' + (s.ms ? 'ora ' + sec(s.ms) + ', ' + lvName(s.level) + ' · ' : '') + n + ' domande</small>' +
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tempo per domanda: ' + esc(s.name) + '">' + g + days + lv + dots + line + '</svg></div>';
+    });
+    if (!panels.length) return '<p class="muted">Ancora pochi dati.</p>';
+    return '<div class="legend"><span><i class="sw dot"></i>una domanda</span><span><i class="sw med"></i>mediana delle ultime 25</span>' +
+      MM.LEVELS.map(function (Lv, j) { return '<span><i class="sw lv' + j + '"></i>' + Lv.name + '</span>'; }).join('') + '</div><div class="charts">' + panels.join('') + '</div>';
   }
-  function modeHtml(k, idx, name) {
-    var ss = db.sessions.filter(function (s) { return s.key === k; });
-    // one dot per question answered: many more data points than one per game (Alessio, site note 2026-11-20)
-    var tOf = {};
-    ss.forEach(function (s) { tOf[s.id] = s.t; });
-    var tm = db.qs.filter(function (q) { return tOf[q.s] && !q.skip && q.ms; }).map(function (q) { return { t: tOf[q.s], v: q.ms / 1000, lab: q.x + ' ' + q.op + ' ' + q.y }; });
-    var sec = function (v) { return v.toFixed(1) + ' s'; };
-    var svg = (tm.length ? chartSvg(tm, 'Tempo per domanda; linea = mediana delle ultime 25 (più basso è meglio)', sec, 'domanda') : '') +
-      (k === MM.modeKey(MM.PRESETS.classica) || !tm.length ? chartSvg(ss.map(function (s) { return { t: s.t, v: s.score }; }), 'Punti a partita', String, 'partita') : '');
+
+  // Heatmap of the table facts: one cell per fact (7×8 and 8×7 together; for ÷, divisor × quotient), colour = time,
+  // one hue on a log scale from 0.8 s to 3 s, shared by × and ÷. Grey = fewer than 3 questions.
+  var FMIN = 800, FMAX = 3000;
+  function factsHtml() {
+    var now = Date.now(), grids = ['×', '÷'].map(function (op) {
+      var f = {};
+      db.qs.forEach(function (q) {
+        if (!q.ms || q.op !== op || MM.stepOf(q) !== op + ':t') return;
+        var a = op === '×' ? [+q.x, +q.y] : [+q.y, +q.x / +q.y], k = Math.min(a[0], a[1]) + '×' + Math.max(a[0], a[1]);
+        (f[k] = f[k] || []).push(q);
+      });
+      if (!Object.keys(f).length) return '';
+      var head = '<tr><th>' + op + '</th>' + [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (j) { return '<th>' + j + '</th>'; }).join('') + '</tr>';
+      var rows = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (i) {
+        return '<tr><th>' + i + '</th>' + [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (j) {
+          var l = f[Math.min(i, j) + '×' + Math.max(i, j)] || [], e = MM.estimate(l, now, 3), fact = op === '×' ? i + ' × ' + j : (i * j) + ' ÷ ' + i;
+          if (e.ms == null) return '<td class="na" title="' + fact + ': ' + l.length + ' domande"></td>';
+          var p = Math.max(0, Math.min(1, Math.log(e.ms / FMIN) / Math.log(FMAX / FMIN))), mix = Math.round(8 + 92 * p);
+          return '<td style="background:color-mix(in oklab, var(--accent) ' + mix + '%, var(--card))' + (mix > 55 ? ';color:var(--bg)' : '') + '" title="' + fact + ': ' + sec(e.ms) + ', ' + l.length + ' domande">' + (e.ms / 1000).toFixed(1) + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+      return '<div class="scroll"><table class="heat">' + head + rows + '</table></div>';
+    }).filter(Boolean);
+    if (!grids.length) return '<p class="muted">Ancora nessuna tabellina.</p>';
+    return '<div class="facts">' + grids.join('') + '</div><div class="legend"><span>' + sec(FMIN) + ' <i class="ramp"></i> ' + sec(FMAX) + ' o più</span><span><i class="sw na"></i>meno di 3 domande</span></div>';
+  }
+
+  // Classica: score per game (dots) and mean of each day (line); the only per-mode chart, comparable with the past.
+  function classicHtml() {
+    var ss = db.sessions.filter(function (s) { return s.key === MM.modeKey(MM.PRESETS.classica); });
+    if (!ss.length) return '<p class="muted">Ancora nessuna partita Classica.</p>';
+    var W = 640, H = 180, L = 34, B = 22, T = 14, max = Math.max.apply(null, ss.map(function (s) { return s.score; })) || 1;
+    var x = function (i) { return L + (ss.length === 1 ? (W - L - 10) / 2 : i * (W - L - 10) / (ss.length - 1)); };
+    var y = function (v) { return T + (H - T - B) * (1 - v / max); };
+    var days = [], cur = null;
+    ss.forEach(function (s, i) { var d = s.t.slice(0, 10); if (!cur || cur.d !== d) days.push(cur = { d: d, i: [], sum: 0 }); cur.i.push(i); cur.sum += s.score; });
+    var line = days.map(function (d) { return x((d.i[0] + d.i[d.i.length - 1]) / 2).toFixed(1) + ',' + y(d.sum / d.i.length).toFixed(1); });
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Punti a partita nella Classica">' +
+      '<line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(0) + '" y2="' + y(0) + '"/><line class="ax" x1="' + L + '" x2="' + (W - 10) + '" y1="' + y(max) + '" y2="' + y(max) + '"/>' +
+      '<text x="' + (L - 6) + '" y="' + (y(0) + 4) + '" text-anchor="end">0</text><text x="' + (L - 6) + '" y="' + (y(max) + 4) + '" text-anchor="end">' + max + '</text>' +
+      '<text x="' + L + '" y="' + (H - 4) + '">partita 1</text><text x="' + (W - 10) + '" y="' + (H - 4) + '" text-anchor="end">partita ' + ss.length + '</text>' +
+      ss.map(function (s, i) { return '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(s.score).toFixed(1) + '" r="3"><title>' + s.t.slice(0, 10) + ': ' + s.score + '</title></circle>'; }).join('') +
+      (line.length > 1 ? '<path d="M' + line.join('L') + '"/>' : '') + '</svg>';
     var list = '<details><summary>Tutte le partite (' + ss.length + ')</summary><table><tr><th>Data</th><th>Punti</th></tr>' + ss.slice().reverse().map(function (s) {
       // imported games have no real time of day: date only
       return '<tr><td>' + esc(new Date(s.t).toLocaleString('it-IT', s.src ? { dateStyle: 'short' } : { dateStyle: 'short', timeStyle: 'short' })) + (s.src ? ' <small>(importata)</small>' : '') + '</td><td>' + s.score + '</td></tr>';
     }).join('') + '</table></details>';
-    return '<div class="mode" id="m' + idx + '"><h3>' + esc(name) + '</h3>' + svg + list + '</div>';
+    return '<div class="mode">' + svg + list + '</div>';
   }
 
   $('#export').addEventListener('click', function () {
