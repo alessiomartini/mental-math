@@ -244,14 +244,14 @@
   // old games fade out instead of being dropped), with ± one standard error from the effective sample size.
   // Skips count as at least SKIP ms; every time is capped at CAP so one distracted question cannot dominate.
   var HALF = 7, SKIP = 10000, CAP = 20000, DAY = 864e5;
-  function estimate(list, now) {
+  function estimate(list, now, minN) {
     var sw = 0, sw2 = 0, sv = 0, svv = 0;
     list.forEach(function (q) {
       var w = Math.pow(0.5, Math.max(0, now - (q.s || now)) / DAY / HALF);
       var v = Math.log(Math.min(CAP, q.skip ? Math.max(q.ms, SKIP) : q.ms));
       sw += w; sw2 += w * w; sv += w * v; svv += w * v * v;
     });
-    if (list.length < 5) return { n: list.length, ms: null };
+    if (list.length < (minN || 5)) return { n: list.length, ms: null };
     var m = sv / sw, se = Math.sqrt(Math.max(0, svv / sw - m * m) / (sw * sw / sw2));
     return { n: list.length, ms: Math.exp(m), lo: Math.exp(m - se), hi: Math.exp(m + se) };
   }
@@ -266,7 +266,8 @@
     qs.forEach(function (q) { var k = key(q); (by[k] = by[k] || []).push(q); });
     return groups.map(function (g) {
       var e = estimate(by[g.id] || [], now || Date.now());
-      return Object.assign({ id: g.id, name: g.name, base: g.base, skill: g.skill, level: levelOf(e.ms, g.base) }, e);
+      var l = by[g.id] || [];
+      return Object.assign({ id: g.id, name: g.name, base: g.base, skill: g.skill, level: levelOf(e.ms, g.base), slip: l.length ? l.filter(function (q) { return q.slip; }).length / l.length : 0 }, e);
     });
   }
   function skillScores(qs, now) { return scores(SKILLS, skillOf, qs, now); }
